@@ -7,5 +7,6 @@ import com.epiis.apirfbvc.entity.EntitySupplier;
 
 @Repository
 public interface RepositorySupplier extends JpaRepository<EntitySupplier, String> {
-
+	   boolean existsByRuc(String ruc);
+	    boolean existsByRucAndIdSupplierNot(String ruc, String idSupplier);
 }
