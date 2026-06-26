@@ -111,6 +111,52 @@ create table tinventorymovementdetail(
   foreign key(idLot) references tlot(idLot)
 );
 
+create table tcustomer (
+  idCustomer char(36) primary key,
+  documentType varchar(20) not null,    -- DNI, RUC, CE, etc.
+  documentNumber varchar(20) not null unique,
+  name varchar(120) not null,
+  phone varchar(20),
+  email varchar(100),
+  address varchar(150),
+  status varchar(20) not null,  -- Activo, Inactivo
+  createdAt datetime not null,
+  updatedAt datetime not null
+);
+
+create table tsale(
+idSale char(36) primary key,
+saleNumber varchar(20) not null unique,
+saleDate datetime not null,
+subtotal decimal(10,2) not null,
+discount decimal(10,2) default 0,
+igv decimal(10,2) not null,
+total decimal(10,2) not null,
+paymentMethod varchar(30) not null,
+status varchar(20) not null, -- Completada, Anulada
+idUser char(36) not null,
+idCustomer char(36) not null,
+createdAt datetime not null,
+updatedAt datetime not null, 
+
+foreign key(idCustomer) references tcustomer(idCustomer),
+foreign key(idUser) references tuser(idUser)
+);
+
+create table tsaledetail(
+idSaleDetail char(36) primary key,
+quantity int not null,
+unitPrice decimal(10,2) not null,
+subtotal decimal(10,2) not null,
+idSale char(36) not null,
+idProduct char(36) not null,
+idLot char(36),
+
+foreign key(idSale) references tsale(idSale),
+foreign key(idProduct) references tproduct(idProduct),
+foreign key(idLot) references tlot(idLot)
+);
+
 -- 1. tuser
 INSERT INTO tuser VALUES
 ('70abf4a7-4dd2-4fd1-b634-65d1952aeb7a', 'avatar.png', '75576009', 'Franco', 'Taype Huamani', 'taypehuamanifranco@gmail.com', '$2a$12$HkHAQZZu4Qx.vUow.hK2tOU61GZLFc0pcZfKL6QJcwUqLJIrP8Zfa', '918355614', 'administrador', 'activo', NOW(), NOW()),
