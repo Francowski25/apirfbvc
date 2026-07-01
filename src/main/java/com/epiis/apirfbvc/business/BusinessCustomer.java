@@ -1,15 +1,17 @@
 package com.epiis.apirfbvc.business;
 
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
+import com.epiis.apirfbvc.dto.request.RequestCustomerInsert;
 import com.epiis.apirfbvc.dto.response.ResponseCustomerGetAll;
-import com.epiis.apirfbvc.dto.response.ResponseUserGetAll;
+import com.epiis.apirfbvc.dto.response.ResponseCustomerInsert;
 import com.epiis.apirfbvc.entity.EntityCustomer;
-import com.epiis.apirfbvc.entity.EntityUser;
 import com.epiis.apirfbvc.repository.RepositoryCustomer;
 
 @Service
@@ -40,5 +42,38 @@ public class BusinessCustomer {
 		response.success();
 		
 		return response;
+	}
+	
+
+	public ResponseCustomerInsert insert(RequestCustomerInsert request) {
+	    ResponseCustomerInsert response = new ResponseCustomerInsert();
+
+	    if (request.getDocumentNumber() == null || request.getDocumentNumber().isBlank()) {
+	        response.listMessage.add("El número de documento es obligatorio.");
+	        return response;
+	    }
+
+	    if (request.getName() == null || request.getName().isBlank()) {
+	        response.listMessage.add("El nombre es obligatorio.");
+	        return response;
+	    }
+
+	    if (repositoryCustomer.existsByDocumentNumber(request.getDocumentNumber())) {
+	        response.listMessage.add("Ya existe un cliente con ese número de documento.");
+	        return response;
+	    }
+
+	    EntityCustomer customer = new EntityCustomer();
+	    customer.setIdCustomer(UUID.randomUUID().toString());
+	    customer.setDocumentType(request.getDocumentType() != null ? request.getDocumentType() : "DNI");
+	    customer.setDocumentNumber(request.getDocumentNumber());
+	    customer.setName(request.getName());
+		customer.setCreatedAt(new java.sql.Date(new Date().getTime()));
+
+	    repositoryCustomer.save(customer);
+
+	    response.success();
+	    response.listMessage.add("Cliente registrado correctamente.");
+	    return response;
 	}
 }

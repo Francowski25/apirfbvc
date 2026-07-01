@@ -7,5 +7,5 @@ import com.epiis.apirfbvc.entity.EntityCustomer;
 
 @Repository
 public interface RepositoryCustomer extends JpaRepository<EntityCustomer, String>{
-
+    boolean existsByDocumentNumber(String documentNumber);
 }

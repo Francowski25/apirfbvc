@@ -98,19 +98,8 @@ public class BusinessSale {
     public ResponseSaleSave save(RequestSaleSave request) {
         ResponseSaleSave response = new ResponseSaleSave();
 
-        if (request.getIdCustomer() == null || request.getIdCustomer().isBlank()) {
-            response.listMessage.add("El cliente es obligatorio.");
-            return response;
-        }
-
         if (request.getItems() == null || request.getItems().isEmpty()) {
             response.listMessage.add("Debe agregar al menos un producto.");
-            return response;
-        }
-
-        EntityCustomer customer = repositoryCustomer.findById(request.getIdCustomer()).orElse(null);
-        if (customer == null) {
-            response.listMessage.add("Cliente no encontrado.");
             return response;
         }
 
