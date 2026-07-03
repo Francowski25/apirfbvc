@@ -2,6 +2,7 @@ package com.epiis.apirfbvc.controller;
 
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,6 +14,7 @@ import com.epiis.apirfbvc.dto.request.RequestSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseSaleKpi;
 import com.epiis.apirfbvc.dto.response.ResponseSaleRecent;
+import com.epiis.apirfbvc.dto.response.ResponseSaleReport;
 import com.epiis.apirfbvc.dto.response.ResponseSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleTopProducts;
 import com.epiis.apirfbvc.dto.response.ResponseSaleWeek;
@@ -54,5 +56,27 @@ public class SaleController {
     @GetMapping(path = "recent")
     public ResponseEntity<ResponseSaleRecent> getRecent(@RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(businessSale.getRecent(limit));
+    }
+    
+    @GetMapping("report/{from}/{to}")
+    public ResponseEntity<ResponseSaleReport> getReport(
+            @PathVariable String from,
+            @PathVariable String to) {
+
+        return ResponseEntity.ok(businessSale.getReport(from, to));
+    }
+
+    @GetMapping(path = "report/by-user/{from}/{to}")
+    public ResponseEntity<ResponseSaleReport> getReportByUser(
+            @PathVariable String from,
+            @PathVariable String to) {
+        return ResponseEntity.ok(businessSale.getReportByUser(from, to));
+    }
+
+    @GetMapping(path = "report/by-product/{from}/{to}")
+    public ResponseEntity<ResponseSaleReport> getReportByProduct(
+    		@PathVariable String from,
+            @PathVariable String to) {
+        return ResponseEntity.ok(businessSale.getReportByProduct(from, to));
     }
 }

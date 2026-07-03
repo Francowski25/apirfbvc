@@ -8,6 +8,7 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
@@ -20,6 +21,7 @@ import com.epiis.apirfbvc.dto.request.RequestSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseSaleKpi;
 import com.epiis.apirfbvc.dto.response.ResponseSaleRecent;
+import com.epiis.apirfbvc.dto.response.ResponseSaleReport;
 import com.epiis.apirfbvc.dto.response.ResponseSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleTopProducts;
 import com.epiis.apirfbvc.dto.response.ResponseSaleWeek;
@@ -309,5 +311,194 @@ public class BusinessSale {
     private String capitalize(String str) {
         if (str == null || str.isEmpty()) return str;
         return str.substring(0, 1).toUpperCase() + str.substring(1);
+    }
+    
+    public ResponseSaleReport getReport(String from, String to) {
+        ResponseSaleReport response = new ResponseSaleReport();
+        try {
+            Date fechaFrom = parseDate(from, false);
+            Date fechaTo = parseDate(to, true);
+
+            List<EntitySale> ventas = repositorySale.findAll().stream()
+                .filter(s -> "Completada".equals(s.getStatus()))
+                .filter(s -> s.getSaleDate() != null
+                    && !s.getSaleDate().before(fechaFrom)
+                    && !s.getSaleDate().after(fechaTo))
+                .sorted((a, b) -> a.getSaleDate().compareTo(b.getSaleDate()))
+                .collect(Collectors.toList());
+
+            double totalMonto = ventas.stream()
+                .mapToDouble(s -> s.getTotal().doubleValue()).sum();
+
+            double totalDescuento = ventas.stream()
+                .mapToDouble(s -> s.getDiscount() != null ? s.getDiscount().doubleValue() : 0).sum();
+
+            double totalIgv = ventas.stream()
+                .mapToDouble(s -> s.getIgv().doubleValue()).sum();
+
+            List<Map<String, Object>> detalle = ventas.stream().map(s -> {
+                Map<String, Object> data = new HashMap<>();
+                data.put("idSale", s.getIdSale());
+                data.put("saleNumber", s.getSaleNumber());
+                data.put("saleDate", s.getSaleDate().toString());
+                data.put("customerName", s.getCustomer() != null ? s.getCustomer().getName() : "Sin cliente");
+                data.put("userName", s.getUser() != null
+                    ? s.getUser().getFirstName() + " " + s.getUser().getSurName() : "—");
+                data.put("paymentMethod", s.getPaymentMethod());
+                data.put("subtotal", s.getSubtotal().toString());
+                data.put("discount", s.getDiscount() != null ? s.getDiscount().toString() : "0");
+                data.put("igv", s.getIgv().toString());
+                data.put("total", s.getTotal().toString());
+                return data;
+            }).collect(Collectors.toList());
+
+            Map<String, Object> resumen = new HashMap<>();
+            resumen.put("totalVentas", ventas.size());
+            resumen.put("totalMonto", totalMonto);
+            resumen.put("totalDescuento", totalDescuento);
+            resumen.put("totalIgv", totalIgv);
+            resumen.put("ticketPromedio", ventas.isEmpty() ? 0 : totalMonto / ventas.size());
+
+            response.setResumen(resumen);
+            response.setDetalle(detalle);
+            response.success();
+
+        } catch (Exception e) {
+            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        }
+        return response;
+    }
+
+    public ResponseSaleReport getReportByUser(String from, String to) {
+        ResponseSaleReport response = new ResponseSaleReport();
+        try {
+            Date fechaFrom = parseDate(from, false);
+            Date fechaTo = parseDate(to, true);
+
+            List<EntitySale> ventas = repositorySale.findAll().stream()
+                .filter(s -> "Completada".equals(s.getStatus()))
+                .filter(s -> s.getSaleDate() != null
+                    && !s.getSaleDate().before(fechaFrom)
+                    && !s.getSaleDate().after(fechaTo))
+                .collect(Collectors.toList());
+
+            Map<String, Map<String, Object>> porUsuario = new LinkedHashMap<>();
+
+            for (EntitySale s : ventas) {
+                String idUser = s.getUser() != null ? s.getUser().getIdUser() : "sin-usuario";
+                String userName = s.getUser() != null
+                    ? s.getUser().getFirstName() + " " + s.getUser().getSurName() : "Sin usuario";
+                String role = s.getUser() != null ? s.getUser().getRole() : "—";
+
+                porUsuario.computeIfAbsent(idUser, k -> {
+                    Map<String, Object> m = new HashMap<>();
+                    m.put("idUser", idUser);
+                    m.put("userName", userName);
+                    m.put("role", role);
+                    m.put("totalVentas", 0);
+                    m.put("totalMonto", 0.0);
+                    return m;
+                });
+
+                Map<String, Object> u = porUsuario.get(idUser);
+                u.put("totalVentas", (int) u.get("totalVentas") + 1);
+                u.put("totalMonto", (double) u.get("totalMonto") + s.getTotal().doubleValue());
+            }
+
+            List<Map<String, Object>> detalle = new ArrayList<>(porUsuario.values());
+            detalle.sort((a, b) -> Double.compare((double) b.get("totalMonto"), (double) a.get("totalMonto")));
+
+            double totalMonto = detalle.stream().mapToDouble(d -> (double) d.get("totalMonto")).sum();
+
+            Map<String, Object> resumen = new HashMap<>();
+            resumen.put("totalVentas", ventas.size());
+            resumen.put("totalMonto", totalMonto);
+            resumen.put("totalUsuarios", detalle.size());
+
+            response.setResumen(resumen);
+            response.setDetalle(detalle);
+            response.success();
+
+        } catch (Exception e) {
+            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        }
+        return response;
+    }
+
+    public ResponseSaleReport getReportByProduct(String from, String to) {
+        ResponseSaleReport response = new ResponseSaleReport();
+        try {
+            Date fechaFrom = parseDate(from, false);
+            Date fechaTo = parseDate(to, true);
+
+            List<EntitySale> ventas = repositorySale.findAll().stream()
+                .filter(s -> "Completada".equals(s.getStatus()))
+                .filter(s -> s.getSaleDate() != null
+                    && !s.getSaleDate().before(fechaFrom)
+                    && !s.getSaleDate().after(fechaTo))
+                .collect(Collectors.toList());
+
+            Map<String, Map<String, Object>> porProducto = new LinkedHashMap<>();
+
+            for (EntitySale s : ventas) {
+                List<EntitySaleDetail> detalles = repositorySaleDetail.findBySale_IdSale(s.getIdSale());
+                for (EntitySaleDetail d : detalles) {
+                    String idProduct = d.getProduct() != null ? d.getProduct().getIdProduct() : "sin-producto";
+                    String productName = d.getProduct() != null ? d.getProduct().getName() : "Sin producto";
+
+                    porProducto.computeIfAbsent(idProduct, k -> {
+                        Map<String, Object> m = new HashMap<>();
+                        m.put("idProduct", idProduct);
+                        m.put("productName", productName);
+                        m.put("totalQty", 0);
+                        m.put("totalMonto", 0.0);
+                        m.put("vecesVendido", 0);
+                        return m;
+                    });
+
+                    Map<String, Object> p = porProducto.get(idProduct);
+                    p.put("totalQty", (int) p.get("totalQty") + d.getQuantity());
+                    p.put("totalMonto", (double) p.get("totalMonto") + d.getSubtotal().doubleValue());
+                    p.put("vecesVendido", (int) p.get("vecesVendido") + 1);
+                }
+            }
+
+            List<Map<String, Object>> detalle = new ArrayList<>(porProducto.values());
+            detalle.sort((a, b) -> Integer.compare((int) b.get("totalQty"), (int) a.get("totalQty")));
+
+            int totalUnidades = detalle.stream().mapToInt(d -> (int) d.get("totalQty")).sum();
+            double totalMonto = detalle.stream().mapToDouble(d -> (double) d.get("totalMonto")).sum();
+
+            Map<String, Object> resumen = new HashMap<>();
+            resumen.put("totalProductos", detalle.size());
+            resumen.put("totalUnidades", totalUnidades);
+            resumen.put("totalMonto", totalMonto);
+
+            response.setResumen(resumen);
+            response.setDetalle(detalle);
+            response.success();
+
+        } catch (Exception e) {
+            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        }
+        return response;
+    }
+
+    private Date parseDate(String dateStr, boolean endOfDay) {
+        try {
+            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
+            Date date = sdf.parse(dateStr);
+            if (endOfDay) {
+                Calendar cal = Calendar.getInstance();
+                cal.setTime(date);
+                cal.set(Calendar.HOUR_OF_DAY, 23);
+                cal.set(Calendar.MINUTE, 59);
+                cal.set(Calendar.SECOND, 59);
+                return cal.getTime();
+            }
+            return date;
+        } catch (Exception e) {
+            return endOfDay ? new Date() : new Date(0);
+        }
     }
 }
