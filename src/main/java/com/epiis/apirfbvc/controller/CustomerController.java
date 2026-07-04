@@ -11,6 +11,7 @@ import com.epiis.apirfbvc.business.BusinessCustomer;
 import com.epiis.apirfbvc.dto.request.RequestCustomerInsert;
 import com.epiis.apirfbvc.dto.response.ResponseCustomerGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseCustomerInsert;
+import com.epiis.apirfbvc.dto.response.ResponseCustomerReport;
 
 import jakarta.validation.Valid;
 
@@ -40,5 +41,10 @@ public class CustomerController {
 	@GetMapping(path = "getall")
 	public ResponseEntity<ResponseCustomerGetAll> listUsers() {
 		return ResponseEntity.ok(businessCustomer.getAll());
+	}
+	
+	@GetMapping(path = "report/frequent")
+	public ResponseEntity<ResponseCustomerReport> getReportFrequent() {
+	    return ResponseEntity.ok(businessCustomer.getReportFrequent());
 	}
 }
