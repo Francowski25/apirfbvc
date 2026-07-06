@@ -1,19 +1,27 @@
 package com.epiis.apirfbvc.business;
 
 import java.io.IOException;
+import java.time.LocalDate;
+import java.math.BigDecimal;
+import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
 import com.epiis.apirfbvc.dto.request.RequestUserInsert;
+import com.epiis.apirfbvc.dto.response.ResponseUserDashboardKpi;
 import com.epiis.apirfbvc.dto.response.ResponseUserGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseUserInsert;
+import com.epiis.apirfbvc.entity.EntitySale;
 import com.epiis.apirfbvc.entity.EntityUser;
+import com.epiis.apirfbvc.repository.RepositoryLot;
+import com.epiis.apirfbvc.repository.RepositorySale;
 import com.epiis.apirfbvc.repository.RepositoryUser;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -21,15 +29,19 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 public class BusinessUser {
 	private final RepositoryUser repositoryUser;
     private final PasswordEncoder passwordEncoder;
+    private final RepositorySale repositorySale;
+    private final RepositoryLot repositoryLot;
 	
 	public BusinessUser(
 			RepositoryUser repositoryUser,
-            PasswordEncoder passwordEncoder
-
+			RepositorySale repositorySale,
+            PasswordEncoder passwordEncoder,
+            RepositoryLot repositoryLot
 	) {
 		this.repositoryUser = repositoryUser;
 		this.passwordEncoder = passwordEncoder;
-
+		this.repositorySale = repositorySale;
+		this.repositoryLot = repositoryLot;
 	}
 	
 	public ResponseUserInsert insert(RequestUserInsert request) throws IOException {
@@ -126,6 +138,59 @@ public class BusinessUser {
 	        response.listMessage.add("Error al actualizar el estado: " + e.getMessage());
 	    }
 	    
+	    return response;
+	}
+	
+	public ResponseUserDashboardKpi getDashboardKpi(String idUser) {
+
+	    ResponseUserDashboardKpi response = new ResponseUserDashboardKpi();
+
+	    try {
+
+	        LocalDate hoy = LocalDate.now();
+
+	        List<EntitySale> ventasHoy = repositorySale.findAll().stream()
+	                .filter(s -> "Completada".equals(s.getStatus()))
+	                .filter(s -> s.getUser() != null)
+	                .filter(s -> s.getUser().getIdUser().equals(idUser))
+	                .filter(s -> s.getSaleDate() != null)
+	                .filter(s -> s.getSaleDate().toInstant()
+	                        .atZone(ZoneId.systemDefault())
+	                        .toLocalDate()
+	                        .equals(hoy))
+	                .collect(Collectors.toList());
+
+	        double montoVendido = ventasHoy.stream()
+	                .map(EntitySale::getTotal)
+	                .mapToDouble(BigDecimal::doubleValue)
+	                .sum();
+
+	        double ticketPromedio =
+	                ventasHoy.isEmpty()
+	                ? 0
+	                : montoVendido / ventasHoy.size();
+
+	        long stockCritico = repositoryLot.findAll().stream()
+	                .filter(l -> l.getProduct() != null)
+	                .filter(l -> l.getCurrentStock() != null)
+	                .filter(l -> l.getCurrentStock() <= l.getProduct().getStockMinimum())
+	                .count();
+
+	        Map<String, Object> resumen = new HashMap<>();
+
+	        resumen.put("misVentasHoy", ventasHoy.size());
+	        resumen.put("montoVendidoHoy", montoVendido);
+	        resumen.put("ticketPromedio", ticketPromedio);
+	        resumen.put("stockCritico", stockCritico);
+
+	        response.setResumen(resumen);
+
+	        response.success();
+
+	    } catch (Exception e) {
+	        response.listMessage.add("Error al obtener KPIs: " + e.getMessage());
+	    }
+
 	    return response;
 	}
 }

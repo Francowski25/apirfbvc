@@ -13,6 +13,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.epiis.apirfbvc.business.BusinessUser;
 import com.epiis.apirfbvc.dto.request.RequestUserInsert;
+import com.epiis.apirfbvc.dto.response.ResponseUserDashboardKpi;
 import com.epiis.apirfbvc.dto.response.ResponseUserGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseUserInsert;
 import jakarta.validation.Valid;
@@ -61,5 +62,13 @@ public class UserController {
 	@PutMapping(path = "status/{id}/{newStatus}")
 	public ResponseEntity<ResponseUserInsert> updateStatus(@PathVariable String id, @PathVariable String newStatus) {
 	    return ResponseEntity.ok(businessUser.updateUserStatus(id, newStatus));
+	}
+	
+	@GetMapping(path = "dashboard/kpi/{idUser}")
+	public ResponseEntity<ResponseUserDashboardKpi> getDashboardKpi(
+	        @PathVariable String idUser) {
+
+	    return ResponseEntity.ok(
+	            businessUser.getDashboardKpi(idUser));
 	}
 }
