@@ -23,13 +23,16 @@ public class EntitySale {
 
     @Column(name = "saleNumber")
     private String saleNumber;
+    
     @Column(name = "saleDate")
     private Date saleDate;
 
     @Column(name = "subtotal")
     private BigDecimal subtotal;
+    
     @Column(name = "discount")
     private BigDecimal discount;
+    
     @Column(name = "igv")
     private BigDecimal igv;
     @Column(name = "total")
@@ -37,6 +40,7 @@ public class EntitySale {
 
     @Column(name = "paymentMethod")
     private String paymentMethod;
+    
     @Column(name = "status")
     private String status;
 
@@ -50,6 +54,7 @@ public class EntitySale {
 
     @Column(name = "createdAt")
     private Date createdAt;
+    
     @Column(name = "updatedAt")
     private Date updatedAt;
 }

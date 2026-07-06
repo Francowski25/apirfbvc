@@ -66,6 +66,8 @@ public class BusinessProduct {
         lot.setPurchasePrice(BigDecimal.ZERO);
         lot.setProduct(product);
         lot.setSupplier(null);
+        lot.setCreatedAt(new java.sql.Date(new Date().getTime()));
+		lot.setUpdatedAt(lot.getCreatedAt());
 
         if (request.getNextExpiration() != null && !request.getNextExpiration().isBlank()) {
             lot.setExpirationDate(LocalDate.parse(request.getNextExpiration()));

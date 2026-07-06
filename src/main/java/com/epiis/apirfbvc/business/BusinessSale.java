@@ -106,16 +106,19 @@ public class BusinessSale {
         }
 
         for (RequestSaleSave.SaleItem item : request.getItems()) {
-            EntityLot lot = repositoryLot.findById(item.getIdLot()).orElse(null);
-            if (lot == null) {
-                response.listMessage.add("Lote no encontrado: " + item.getIdLot());
-                return response;
-            }
-            if (lot.getCurrentStock() < item.getQuantity()) {
-                response.listMessage.add("Stock insuficiente en lote " + lot.getCode()
-                    + ". Disponible: " + lot.getCurrentStock());
-                return response;
-            }
+        	String idLot = item.getIdLot();
+
+        	if (idLot == null || idLot.isBlank()) {
+        	    response.listMessage.add("El lote es obligatorio.");
+        	    return response;
+        	}
+
+        	EntityLot lot = repositoryLot.findById(idLot).orElse(null);
+
+        	if (lot == null) {
+        	    response.listMessage.add("Lote no encontrado: " + idLot);
+        	    return response;
+        	}
         }
 
         BigDecimal subtotal = BigDecimal.ZERO;
@@ -146,9 +149,19 @@ public class BusinessSale {
         sale.setCreatedAt(new java.sql.Date(new Date().getTime()));
         sale.setUpdatedAt(sale.getCreatedAt());
 
-        EntityCustomer customerRef = new EntityCustomer();
-        customerRef.setIdCustomer(request.getIdCustomer());
-        sale.setCustomer(customerRef);
+        String idCustomer = request.getIdCustomer();
+
+        if (idCustomer != null && !idCustomer.isBlank()) {
+
+            EntityCustomer customerRef = repositoryCustomer
+                    .findById(idCustomer)
+                    .orElseThrow(() -> new RuntimeException("Cliente no encontrado."));
+
+            sale.setCustomer(customerRef);
+
+        } else {
+            sale.setCustomer(null);
+        }
 
         EntityUser userRef = new EntityUser();
         userRef.setIdUser(request.getIdUser());
@@ -177,9 +190,18 @@ public class BusinessSale {
             detail.setLot(lotRef);
 
             repositorySaleDetail.save(detail);
+            
+            String idLot = item.getIdLot();
 
-            EntityLot lot = repositoryLot.findById(item.getIdLot()).orElse(null);
-            if (lot == null) continue;
+            if (idLot == null || idLot.isBlank()) {
+                continue;
+            }
+
+            EntityLot lot = repositoryLot.findById(idLot).orElse(null);
+
+            if (lot == null) {
+                continue;
+            }
 
             lot.setCurrentStock(lot.getCurrentStock() - item.getQuantity());
             lot.setUpdatedAt(new java.sql.Date(new Date().getTime()));
@@ -226,8 +248,9 @@ public class BusinessSale {
             double total = ventasDia.stream().mapToDouble(s -> s.getTotal().doubleValue()).sum();
 
             LocalDate fecha = LocalDate.now().minusDays(i);
-            String diaNombre = fecha.getDayOfWeek().getDisplayName(TextStyle.SHORT, new Locale("es", "ES"));
-
+            String diaNombre = fecha.getDayOfWeek()
+                    .getDisplayName(TextStyle.SHORT, Locale.of("es", "ES"));
+            
             Map<String, Object> item = new HashMap<>();
             item.put("dia", capitalize(diaNombre));
             item.put("fecha", fecha.toString());
@@ -253,7 +276,11 @@ public class BusinessSale {
 
         for (EntitySaleDetail d : detalles) {
             String idProduct = d.getProduct().getIdProduct();
-            acumulado.merge(idProduct, d.getQuantity(), Integer::sum);
+            acumulado.merge(
+            	    idProduct,
+            	    d.getQuantity(),
+            	    (a, b) -> a + b
+            	);
             nombres.put(idProduct, d.getProduct().getName());
         }
 
