@@ -2,9 +2,12 @@ package com.epiis.apirfbvc.business;
 
 import java.math.BigDecimal;
 import java.math.RoundingMode;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.HashMap;
@@ -21,10 +24,12 @@ import com.epiis.apirfbvc.dto.request.RequestSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseSaleKpi;
 import com.epiis.apirfbvc.dto.response.ResponseSaleRecent;
+import com.epiis.apirfbvc.dto.response.ResponseSaleRecentUser;
 import com.epiis.apirfbvc.dto.response.ResponseSaleReport;
 import com.epiis.apirfbvc.dto.response.ResponseSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleTopProducts;
 import com.epiis.apirfbvc.dto.response.ResponseSaleWeek;
+import com.epiis.apirfbvc.dto.response.ResponseSaleWeekUser;
 import com.epiis.apirfbvc.entity.EntityCustomer;
 import com.epiis.apirfbvc.entity.EntityLot;
 import com.epiis.apirfbvc.entity.EntityProduct;
@@ -527,5 +532,87 @@ public class BusinessSale {
         } catch (Exception e) {
             return endOfDay ? new Date() : new Date(0);
         }
+    }
+    
+    public ResponseSaleWeekUser getDashboardSalesWeek(String idUser) {
+
+        ResponseSaleWeekUser response = new ResponseSaleWeekUser();
+
+        try {
+
+            LocalDate hoy = LocalDate.now();
+            LocalDate inicioSemana = hoy.with(DayOfWeek.MONDAY);
+
+            String[] dias = { "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom" };
+            double[] valores = new double[7];
+
+            List<EntitySale> ventas = repositorySale.findAll().stream()
+                    .filter(s -> "Completada".equals(s.getStatus()))
+                    .filter(s -> s.getUser() != null)
+                    .filter(s -> s.getUser().getIdUser().equals(idUser))
+                    .filter(s -> s.getSaleDate() != null)
+                    .collect(Collectors.toList());
+
+            for (EntitySale venta : ventas) {
+
+                LocalDate fecha = venta.getSaleDate().toInstant()
+                        .atZone(ZoneId.systemDefault())
+                        .toLocalDate();
+
+                if (!fecha.isBefore(inicioSemana) && !fecha.isAfter(hoy)) {
+
+                    int index = fecha.getDayOfWeek().getValue() - 1;
+
+                    valores[index] += venta.getTotal().doubleValue();
+                }
+            }
+
+            response.setLabels(Arrays.asList(dias));
+
+            response.setValues(Arrays.stream(valores)
+                    .boxed()
+                    .collect(Collectors.toList()));
+
+            response.success();
+
+        } catch (Exception e) {
+            response.listMessage.add("Error al obtener ventas semanales: " + e.getMessage());
+        }
+
+        return response;
+    }
+
+    public ResponseSaleRecentUser getRecent(String idUser, int limit) {
+
+        ResponseSaleRecentUser response = new ResponseSaleRecentUser();
+
+        List<EntitySale> ventas = repositorySale.findAll().stream()
+                .filter(s -> "Completada".equals(s.getStatus()))
+                .filter(s -> s.getUser() != null)
+                .filter(s -> s.getUser().getIdUser().equals(idUser))
+                .sorted((a, b) -> b.getSaleDate().compareTo(a.getSaleDate()))
+                .limit(limit)
+                .collect(Collectors.toList());
+
+        for (EntitySale item : ventas) {
+
+            Map<String, Object> data = new HashMap<>();
+
+            data.put("idSale", item.getIdSale());
+            data.put("saleNumber", item.getSaleNumber());
+            data.put("saleDate", item.getSaleDate().toString());
+            data.put("customerName",
+                    item.getCustomer() != null
+                            ? item.getCustomer().getName()
+                            : "Sin cliente");
+            data.put("paymentMethod", item.getPaymentMethod());
+            data.put("total", item.getTotal().toString());
+
+            response.getListSales().add(data);
+        }
+
+        response.success();
+
+        return response;
     }
 }
