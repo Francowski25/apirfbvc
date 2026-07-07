@@ -1,6 +1,5 @@
 package com.epiis.apirfbvc.controller;
 
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -15,12 +14,10 @@ import com.epiis.apirfbvc.dto.request.RequestSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseSaleKpi;
 import com.epiis.apirfbvc.dto.response.ResponseSaleRecent;
-import com.epiis.apirfbvc.dto.response.ResponseSaleRecentUser;
 import com.epiis.apirfbvc.dto.response.ResponseSaleReport;
 import com.epiis.apirfbvc.dto.response.ResponseSaleSave;
 import com.epiis.apirfbvc.dto.response.ResponseSaleTopProducts;
 import com.epiis.apirfbvc.dto.response.ResponseSaleWeek;
-import com.epiis.apirfbvc.dto.response.ResponseSaleWeekUser;
 
 @RestController
 @RequestMapping(path = "sale")
@@ -81,22 +78,5 @@ public class SaleController {
     		@PathVariable String from,
             @PathVariable String to) {
         return ResponseEntity.ok(businessSale.getReportByProduct(from, to));
-    }
-    
-    @GetMapping(path = "user/sales-week/{idUser}")
-    public ResponseEntity<ResponseSaleWeekUser> getDashboardSalesWeek(
-            @Autowired String idUser) {
-
-        return ResponseEntity.ok(
-                businessSale.getDashboardSalesWeek(idUser));
-    }
-
-    @GetMapping(path = "user/recent/{idUser}")
-    public ResponseEntity<ResponseSaleRecentUser> getRecent(
-            @PathVariable String idUser,
-            @RequestParam(defaultValue = "5") int limit) {
-
-        return ResponseEntity.ok(
-                businessSale.getRecent(idUser, limit));
     }
 }
