@@ -1,5 +1,5 @@
-create database if not exists dbbvc;
-use dbbvc;
+create database if not exists copdbbvc;
+use copdbbvc;
 
 create table tuser (
   idUser char(36) primary key,
@@ -60,7 +60,7 @@ create table tproduct (
   idLaboratory char(36),
   createdAt datetime not null,
   updatedAt datetime not null,
-  
+
   foreign key(idLaboratory) references tlaboratory(idLaboratory),
   foreign key (idCategory) references tcategory(idCategory)
 );
@@ -70,22 +70,14 @@ create table tlot (
   code varchar(30) not null unique,
   expirationDate date not null,
   purchasePrice decimal(10,2) not null,
-  currentStock int not null default 0,
-  idProduct char(36),
+  currentStock int not null default 0 check (currentStock >= 0),
+  idProduct char(36) not null,
   idSupplier char(36),
   createdAt datetime not null,
   updatedAt datetime not null,
-  
+
   foreign key (idProduct) references tproduct(idProduct),
   foreign key (idSupplier) references tsupplier(idSupplier)
-);
-
-create table tinventory(
-  idProduct char(36) primary key,
-  stock int not null default 0 check(stock >= 0),
-  lastUpdated datetime not null,
-  
-  foreign key(idProduct)references tproduct(idProduct)
 );
 
 create table tinventorymovement(
@@ -94,7 +86,7 @@ create table tinventorymovement(
   observation varchar(255),
   movementDate datetime not null,
   idUser char(36) not null,
-  
+
   foreign key(idUser) references tuser(idUser)
 );
 
@@ -103,53 +95,49 @@ create table tinventorymovementdetail(
   quantity int not null,
   unitCost decimal(10,2),
   idMovement char(36) not null,
-  idProduct char(36) not null,
-  idLot char(36),
-  
+  idLot char(36) not null,
+
   foreign key(idMovement) references tinventorymovement(idMovement),
-  foreign key(idProduct) references tproduct(idProduct),
   foreign key(idLot) references tlot(idLot)
 );
 
 create table tcustomer (
   idCustomer char(36) primary key,
-  documentType varchar(20) not null,    -- DNI, RUC, CE, etc.
+  documentType varchar(20) not null,
   documentNumber varchar(20) not null unique,
   name varchar(120) not null,
   createdAt datetime not null
 );
 
 create table tsale(
-idSale char(36) primary key,
-saleNumber varchar(20) not null unique,
-saleDate datetime not null,
-subtotal decimal(10,2) not null,
-discount decimal(10,2) default 0,
-igv decimal(10,2) not null,
-total decimal(10,2) not null,
-paymentMethod varchar(30) not null,
-status varchar(20) not null, -- Completada, Anulada
-idUser char(36) null,
-idCustomer char(36) null,
-createdAt datetime not null,
-updatedAt datetime not null, 
+  idSale char(36) primary key,
+  saleNumber varchar(20) not null unique,
+  saleDate datetime not null,
+  subtotal decimal(10,2) not null,
+  discount decimal(10,2) default 0,
+  igv decimal(10,2) not null,
+  total decimal(10,2) not null,
+  paymentMethod varchar(30) not null,
+  status varchar(20) not null,
+  idUser char(36) null,
+  idCustomer char(36) null,
+  createdAt datetime not null,
+  updatedAt datetime not null,
 
-foreign key(idCustomer) references tcustomer(idCustomer),
-foreign key(idUser) references tuser(idUser)
+  foreign key(idCustomer) references tcustomer(idCustomer),
+  foreign key(idUser) references tuser(idUser)
 );
 
 create table tsaledetail(
-idSaleDetail char(36) primary key,
-quantity int not null,
-unitPrice decimal(10,2) not null,
-subtotal decimal(10,2) not null,
-idSale char(36) not null,
-idProduct char(36) not null,
-idLot char(36),
+  idSaleDetail char(36) primary key,
+  quantity int not null,
+  unitPrice decimal(10,2) not null,
+  subtotal decimal(10,2) not null,
+  idSale char(36) not null,
+  idLot char(36) not null,
 
-foreign key(idSale) references tsale(idSale),
-foreign key(idProduct) references tproduct(idProduct),
-foreign key(idLot) references tlot(idLot)
+  foreign key(idSale) references tsale(idSale),
+  foreign key(idLot) references tlot(idLot)
 );
 
 -- 1. tuser
@@ -160,7 +148,7 @@ INSERT INTO tuser VALUES
 ('b7d85ece-611f-40be-94c5-1fb709a071af', 'avatar-f.png', '75524009', 'María', 'Huanca', 'maria.huanca@bvc.com', '$2a$12$KMHwk8UQSNphyE.aZWCNGujfAkRm8b21nenvmylQi5uiiP9NMNYKC', '123476009', 'vendedor', 'activo', NOW(), NOW()),
 ('403b00d6-3029-4c33-a732-47f746c98b45', 'avatar2.png', '98236743', 'Jorge', 'Condori', 'jorge.condori@bvc.com', '$2a$12$Usm4uFsKxHugZZS86C2iJeAYEx08.izM.0EsAAE.fAOCsmR9xXbu.', '928316009', 'quimico', 'inactivo', NOW(), NOW()),
 ('59c5d012-7bb4-4c81-80bb-64fbdcf18db0', 'avatar-f.png', '45892311', 'Claudia', 'Mendoza Ramos', 'claudia.mendoza@bvc.com', '$2a$12$Z7xK9pY5M9Jb7vR2wQ1eOu8vK3fG4h5j6k7l8m9n0o1p2q3r4s5t6', '954123789', 'quimico', 'activo', NOW(), NOW()),
-('a12b34cd-56ef-78gh-90ij-1234567890ab', 'avatar.png', '72145698', 'Carlos', 'Espinoza Vega', 'carlos.espinoza@bvc.com', '$2a$12$Y3xO8pX4L8Ja6uQ1vP0dNt7uJ2eF3g4i5j6k7l8m9n0o1p2q3r4s5', '987654321', 'vendedor', 'activo', NOW(), NOW()),
+('a12b34cd-56ef-7890-90ij-1234567890ab', 'avatar.png', '72145698', 'Carlos', 'Espinoza Vega', 'carlos.espinoza@bvc.com', '$2a$12$Y3xO8pX4L8Ja6uQ1vP0dNt7uJ2eF3g4i5j6k7l8m9n0o1p2q3r4s5', '987654321', 'vendedor', 'activo', NOW(), NOW()),
 ('e847c211-c918-4b72-be77-d4a9f3ebac51', 'avatar-f.png', '09432175', 'Elena', 'Flores Choque', 'elena.flores@bvc.com', '$2a$12$X2wN7oW3K7Iz5tP0uO9cMs6tI1dE2f3h4i5j6k7l8m9n0o1p2q3r4', '961524376', 'vendedor', 'inactivo', NOW(), NOW()),
 ('3d9e8c7b-6a5f-4d3c-2b1a-0e9d8c7b6a5f', 'avatar.png', '25841397', 'Ricardo', 'Palomino Ortiz', 'ricardo.palomino@bvc.com', '$2a$12$W1vM6nW2J6Hy4sO9tN8bLr5sH0cD1e2g3h4i5j6k7l8m9n0o1p2q3', '932145678', 'quimico', 'activo', NOW(), NOW()),
 ('fa93b216-cdd2-4b21-8154-1b709a071afc', 'avatar-f.png', '47586912', 'Gabriela', 'Mamani Luna', 'gabriela.mamani@bvc.com', '$2a$12$V0uL5mV1I5Gx3rN8sM7aKq4rH9bC0d1f2g3h4i5j6k7l8m9n0o1p2', '993847561', 'quimico', 'activo', NOW(), NOW());
@@ -214,18 +202,6 @@ INSERT INTO tlot VALUES
 ('f3a4b5c6-d7e8-4901-cdef-333333333333', 'LOT-008', '2026-12-10', 0.38, 8,   'c3d4e5f6-a7b8-4901-bcde-f0123456789a', '06f473ed-1e42-4bbe-829c-0167996a657c', NOW(), NOW()),
 ('f4a5b6c7-d8e9-4012-def0-444444444444', 'LOT-009', '2027-05-30', 12.50, 4,  'd4e5f6a7-b8c9-4012-cdef-0123456789ab', '8919bd47-ec65-4977-bd88-8abf1e3fb592', NOW(), NOW()),
 ('f5a6b7c8-d9e0-4123-ef01-555555555555', 'LOT-010', '2027-09-18', 0.30, 250, 'e5f6a7b8-c9d0-4123-def0-123456789abc', 'd788888b-01f6-4568-83e9-00552e04a83e', NOW(), NOW());
--- 7. tinventory
-INSERT INTO tinventory VALUES
-('57c10dc3-3e41-4bcc-906a-dbae1ca43e46', 0, NOW()),
-('89ae8ff2-6971-4196-b508-dcf5141820fd', 3, NOW()),
-('7bec925e-c6ff-4059-a18b-a8b88738e24d', 150, NOW()),
-('28fdef5c-734d-4b17-949e-991e09488c7a', 10, NOW()),
-('1069e606-393a-4b90-acad-f20565152890', 2, NOW()),
-('a1b2c3d4-e5f6-4789-9abc-def012345678', 0, NOW()),
-('b2c3d4e5-f6a7-4890-abcd-ef0123456789', 180, NOW()),
-('c3d4e5f6-a7b8-4901-bcde-f0123456789a', 8, NOW()),
-('d4e5f6a7-b8c9-4012-cdef-0123456789ab', 4, NOW()),
-('e5f6a7b8-c9d0-4123-def0-123456789abc', 250, NOW());
 
 -- 8. tinventorymovement
 INSERT INTO tinventorymovement VALUES
@@ -233,7 +209,7 @@ INSERT INTO tinventorymovement VALUES
 ('c5d58107-6aae-46e9-a1dc-2385d7af88c3', 'Entrada', 'Compra de Amoxicilina', '2026-06-10 10:15:00', '939dbc34-a1a7-4931-85a0-d291013c6973'),
 ('d32ad5b6-62cf-4542-a8f2-91b5c61760d5', 'Entrada', 'Ingreso de Vitamina C', '2026-06-10 15:00:00', '5d828099-5b65-4516-99e2-6fc49ab51667'),
 ('b7077b61-74c8-4fb2-a554-182f51dc7237', 'Salida', 'Venta mostrador', '2026-06-11 11:30:00', 'b7d85ece-611f-40be-94c5-1fb709a071af'),
-('c7b8b993-6e04-4dba-ace8-d0e6a5dc41f9', 'Salida', 'Venta de Ibuprofeno', '2026-06-12 16:20:00', 'a12b34cd-56ef-78gh-90ij-1234567890ab'),
+('c7b8b993-6e04-4dba-ace8-d0e6a5dc41f9', 'Salida', 'Venta de Ibuprofeno', '2026-06-12 16:20:00', 'a12b34cd-56ef-7890-90ij-1234567890ab'),
 ('df495a86-8a4e-4c69-ab8d-e733b399c676', 'Ajuste_Positivo', 'Corrección de inventario', '2026-06-13 09:45:00', '3d9e8c7b-6a5f-4d3c-2b1a-0e9d8c7b6a5f'),
 ('f5684cea-406b-4d8c-a450-2a5c40dc5ff5', 'Entrada', 'Ingreso de Omeprazol', '2026-06-14 08:30:00', 'fa93b216-cdd2-4b21-8154-1b709a071afc'),
 ('de5744a5-da10-42b0-be75-3e43a59b6856', 'Salida', 'Venta de Diclofenaco', '2026-06-15 13:40:00', '59c5d012-7bb4-4c81-80bb-64fbdcf18db0'),
@@ -242,16 +218,16 @@ INSERT INTO tinventorymovement VALUES
 
 -- 9. tinventorymovementdetail
 INSERT INTO tinventorymovementdetail VALUES
-('det-001-1111-1111-111111111111111111', 100, 0.25, '18f0e2bb-5e6c-446a-8f74-2e1d5d1efc97', '57c10dc3-3e41-4bcc-906a-dbae1ca43e46', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
-('det-002-2222-2222-222222222222222222', 50, 0.60, 'c5d58107-6aae-46e9-a1dc-2385d7af88c3', '89ae8ff2-6971-4196-b508-dcf5141820fd', '1a4b31ec-104c-4467-936a-b4e4fd9f65f2'),
-('det-003-3333-3333-333333333333333333', 150, 0.40, 'd32ad5b6-62cf-4542-a8f2-91b5c61760d5', '7bec925e-c6ff-4059-a18b-a8b88738e24d', 'ce810b6e-9b7e-4c34-b376-4a66bad3e148'),
-('det-004-4444-4444-444444444444444444', 10, 0.25, 'b7077b61-74c8-4fb2-a554-182f51dc7237', '57c10dc3-3e41-4bcc-906a-dbae1ca43e46', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
-('det-005-5555-5555-555555555555555555', 5, 0.35, 'c7b8b993-6e04-4dba-ace8-d0e6a5dc41f9', '28fdef5c-734d-4b17-949e-991e09488c7a', '9972763f-9732-4660-a4cd-00eeabc2b6a3'),
-('det-006-6666-6666-666666666666666666', 3, 4.20, 'df495a86-8a4e-4c69-ab8d-e733b399c676', '1069e606-393a-4b90-acad-f20565152890', 'bb963302-3c56-4b2c-acf8-27e4dc7aa8bc'),
-('det-007-7777-7777-777777777777777777', 180, 0.85, 'f5684cea-406b-4d8c-a450-2a5c40dc5ff5', 'b2c3d4e5-f6a7-4890-abcd-ef0123456789', 'f2a3b4c5-d6e7-4890-bcde-222222222222'),
-('det-008-8888-8888-888888888888888888', 8, 0.38, 'de5744a5-da10-42b0-be75-3e43a59b6856', 'c3d4e5f6-a7b8-4901-bcde-f0123456789a', 'f3a4b5c6-d7e8-4901-cdef-333333333333'),
-('det-009-9999-9999-999999999999999999', 4, 12.50, '29417b69-8da1-4137-b816-4db6fbcee370', 'd4e5f6a7-b8c9-4012-cdef-0123456789ab', 'f4a5b6c7-d8e9-4012-def0-444444444444'),
-('det-010-aaaa-aaaa-aaaaaaaaaaaaaaaaaa', 2, 0.30, '60691a38-58ba-441c-b668-540d4fc9f987', 'e5f6a7b8-c9d0-4123-def0-123456789abc', 'f5a6b7c8-d9e0-4123-ef01-555555555555');
+('11111111-1111-1111-1111-111111111111', 100, 0.25, '18f0e2bb-5e6c-446a-8f74-2e1d5d1efc97', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
+('22222222-2222-2222-2222-222222222222', 50, 0.60, 'c5d58107-6aae-46e9-a1dc-2385d7af88c3', '1a4b31ec-104c-4467-936a-b4e4fd9f65f2'),
+('33333333-3333-3333-3333-333333333333', 150, 0.40, 'd32ad5b6-62cf-4542-a8f2-91b5c61760d5', 'ce810b6e-9b7e-4c34-b376-4a66bad3e148'),
+('44444444-4444-4444-4444-444444444444', 10, 0.25, 'b7077b61-74c8-4fb2-a554-182f51dc7237', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
+('55555555-5555-5555-5555-555555555555', 5, 0.35, 'c7b8b993-6e04-4dba-ace8-d0e6a5dc41f9', '9972763f-9732-4660-a4cd-00eeabc2b6a3'),
+('66666666-6666-6666-6666-666666666666', 3, 4.20, 'df495a86-8a4e-4c69-ab8d-e733b399c676', 'bb963302-3c56-4b2c-acf8-27e4dc7aa8bc'),
+('77777777-7777-7777-7777-777777777777', 180, 0.85, 'f5684cea-406b-4d8c-a450-2a5c40dc5ff5', 'f2a3b4c5-d6e7-4890-bcde-222222222222'),
+('88888888-8888-8888-8888-888888888888', 8, 0.38, 'de5744a5-da10-42b0-be75-3e43a59b6856', 'f3a4b5c6-d7e8-4901-cdef-333333333333'),
+('99999999-9999-9999-9999-999999999999', 4, 12.50, '29417b69-8da1-4137-b816-4db6fbcee370', 'f4a5b6c7-d8e9-4012-def0-444444444444'),
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 2, 0.30, '60691a38-58ba-441c-b668-540d4fc9f987', 'f5a6b7c8-d9e0-4123-ef01-555555555555');
 
 -- 10. tcustomer
 INSERT INTO tcustomer VALUES
@@ -265,23 +241,14 @@ INSERT INTO tcustomer VALUES
 INSERT INTO tsale VALUES
 ('s0011111-1111-1111-1111-111111111111','V000001','2026-06-18 09:30:00',5.00,0.00,0.90,5.90,'Efectivo','Completada','5d828099-5b65-4516-99e2-6fc49ab51667','c0011111-1111-1111-1111-111111111111',NOW(),NOW()),
 ('s0022222-2222-2222-2222-222222222222','V000002','2026-06-18 10:45:00',8.40,0.40,1.44,9.44,'Yape','Completada','b7d85ece-611f-40be-94c5-1fb709a071af','c0022222-2222-2222-2222-222222222222',NOW(),NOW()),
-('s0033333-3333-3333-3333-333333333333','V000003','2026-06-19 11:15:00',18.90,0.00,3.40,22.30,'Tarjeta','Completada','a12b34cd-56ef-78gh-90ij-1234567890ab','c0033333-3333-3333-3333-333333333333',NOW(),NOW()),
+('s0033333-3333-3333-3333-333333333333','V000003','2026-06-19 11:15:00',18.90,0.00,3.40,22.30,'Tarjeta','Completada','a12b34cd-56ef-7890-90ij-1234567890ab','c0033333-3333-3333-3333-333333333333',NOW(),NOW()),
 ('s0044444-4444-4444-4444-444444444444','V000004','2026-06-20 15:10:00',6.80,0.00,1.22,8.02,'Efectivo','Completada','5d828099-5b65-4516-99e2-6fc49ab51667','c0044444-4444-4444-4444-444444444444',NOW(),NOW()),
 ('s0055555-5555-5555-5555-555555555555','V000005','2026-06-21 16:20:00',26.50,1.50,4.50,29.50,'Plin','Completada','b7d85ece-611f-40be-94c5-1fb709a071af','c0055555-5555-5555-5555-555555555555',NOW(),NOW());
 
-
 -- 12. tsaledetail
 INSERT INTO tsaledetail VALUES
-('sd001111-1111-1111-1111-111111111111',10,0.50,5.00, 's0011111-1111-1111-1111-111111111111', '57c10dc3-3e41-4bcc-906a-dbae1ca43e46', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
-('sd002222-2222-2222-2222-222222222222',12,0.70,8.40, 's0022222-2222-2222-2222-222222222222', '28fdef5c-734d-4b17-949e-991e09488c7a','9972763f-9732-4660-a4cd-00eeabc2b6a3'),
-('sd003333-3333-3333-3333-333333333333',1,18.90,18.90, 's0033333-3333-3333-3333-333333333333', 'd4e5f6a7-b8c9-4012-cdef-0123456789ab', 'f4a5b6c7-d8e9-4012-def0-444444444444'),
-('sd004444-4444-4444-4444-444444444444',8,0.85,6.80, 's0044444-4444-4444-4444-444444444444', 'b2c3d4e5-f6a7-4890-abcd-ef0123456789','f2a3b4c5-d6e7-4890-bcde-222222222222'),
-('sd005555-5555-5555-5555-555555555555',5,5.30,26.50, 's0055555-5555-5555-5555-555555555555', '1069e606-393a-4b90-acad-f20565152890', 'bb963302-3c56-4b2c-acf8-27e4dc7aa8bc');
-
--- Comprobación final
-select * from tproduct;
-select * from tuser;
-select * from tcategory;
-select * from tlaboratory;
-select * from tsupplier;
-select * from tcustomer;
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 10, 0.50, 5.00, 's0011111-1111-1111-1111-111111111111', 'a8e2cf6b-f651-4f98-a7af-d3fb12822f04'),
+('cccccccc-cccc-cccc-cccc-cccccccccccc', 12, 0.70, 8.40, 's0022222-2222-2222-2222-222222222222', '9972763f-9732-4660-a4cd-00eeabc2b6a3'),
+('dddddddd-dddd-dddd-dddd-dddddddddddd', 1, 18.90, 18.90, 's0033333-3333-3333-3333-333333333333', 'f4a5b6c7-d8e9-4012-def0-444444444444'),
+('eeeeeeee-eeee-eeee-eeee-eeeeeeeeeeee', 8, 0.85, 6.80, 's0044444-4444-4444-4444-444444444444', 'f2a3b4c5-d6e7-4890-bcde-222222222222'),
+('ffffffff-ffff-ffff-ffff-ffffffffffff', 5, 5.30, 26.50, 's0055555-5555-5555-5555-555555555555', 'bb963302-3c56-4b2c-acf8-27e4dc7aa8bc');

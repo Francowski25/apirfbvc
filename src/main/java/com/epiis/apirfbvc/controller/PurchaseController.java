@@ -28,7 +28,7 @@ public class PurchaseController {
 	}
 	
 	@GetMapping(path = "recent")
-    public ResponseEntity<ResponsePurchaseRecent> getRecent(@RequestParam(defaultValue = "4") int limit) {
+    public ResponseEntity<ResponsePurchaseRecent> getRecent(@RequestParam(defaultValue = "5") int limit) {
         return ResponseEntity.ok(businessPurchase.getRecent(limit));
     }
 	
