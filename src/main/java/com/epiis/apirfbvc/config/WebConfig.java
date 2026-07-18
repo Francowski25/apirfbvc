@@ -14,8 +14,7 @@ public class WebConfig implements WebMvcConfigurer {
                 "http://localhost", 
                 "http://localhost:4200",
                 "https://fabulous-sunflower-dcc159.netlify.app",
-                "https://appcwbvc.vercel.app"
-            )
+                "https://appcwbvc-franco-bvc.vercel.app"            )
             .allowedMethods("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
             .allowedHeaders("*")
             .allowCredentials(true);
