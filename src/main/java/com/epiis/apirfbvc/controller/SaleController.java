@@ -54,7 +54,7 @@ public class SaleController {
     }
 
     @GetMapping(path = "recent")
-    public ResponseEntity<ResponseSaleRecent> getRecent(@RequestParam(defaultValue = "5") int limit) {
+    public ResponseEntity<ResponseSaleRecent> getRecent(@RequestParam(defaultValue = "4	") int limit) {
         return ResponseEntity.ok(businessSale.getRecent(limit));
     }
     
