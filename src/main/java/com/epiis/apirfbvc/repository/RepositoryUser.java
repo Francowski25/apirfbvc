@@ -15,4 +15,6 @@ public interface RepositoryUser extends JpaRepository<EntityUser, String> {
 	boolean existsByDni(String dni);
 	
     boolean existsByEmail(String email);
+    
+    boolean existsByEmailAndIdUserNot(String email, String idUser);
 }

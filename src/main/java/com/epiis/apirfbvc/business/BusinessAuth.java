@@ -57,6 +57,8 @@ public class BusinessAuth {
         response.setStatus(user.getStatus());
         response.setCreatedAt(user.getCreatedAt());
         response.setUpdatedAt(user.getUpdatedAt());
+        response.setCellPhone(user.getCellPhone());
+        response.setImage(user.getImage());
         return response;
     }
 }

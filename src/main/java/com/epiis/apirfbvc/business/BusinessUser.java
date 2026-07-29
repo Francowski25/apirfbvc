@@ -15,6 +15,8 @@ import java.util.stream.Collectors;
 import org.springframework.stereotype.Service;
 
 import com.epiis.apirfbvc.dto.request.RequestUserInsert;
+import com.epiis.apirfbvc.dto.request.RequestUserUpdatePassword;
+import com.epiis.apirfbvc.dto.request.RequestUserUpdateProfile;
 import com.epiis.apirfbvc.dto.response.ResponseUserDashboardKpi;
 import com.epiis.apirfbvc.dto.response.ResponseUserGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseUserInsert;
@@ -189,6 +191,78 @@ public class BusinessUser {
 
 	    } catch (Exception e) {
 	        response.listMessage.add("Error al obtener KPIs: " + e.getMessage());
+	    }
+
+	    return response;
+	}
+
+	public ResponseUserGetAll updateProfile(RequestUserUpdateProfile request) {
+	    ResponseUserGetAll response = new ResponseUserGetAll();
+	    try {
+	        Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
+
+	        if (optionalUser.isEmpty()) {
+	            response.error();
+	            response.listMessage.add("No se encontró el usuario con el ID proporcionado.");
+	            return response;
+	        }
+
+	        EntityUser entityUser = optionalUser.get();
+
+	        boolean emailInUse = repositoryUser.existsByEmailAndIdUserNot(request.getEmail(), request.getIdUser());
+	        if (emailInUse) {
+	            response.warning();
+	            response.listMessage.add("El correo ya está en uso por otro usuario.");
+	            return response;
+	        }
+
+	        if (request.getImage() != null && !request.getImage().trim().isEmpty()) {
+	            entityUser.setImage(request.getImage());
+	        }
+
+	        entityUser.setFirstName(request.getFirstName());
+	        entityUser.setSurName(request.getSurName());
+	        entityUser.setEmail(request.getEmail());
+	        entityUser.setCellPhone(request.getCellPhone());
+	        entityUser.setUpdatedAt(new java.sql.Date(new java.util.Date().getTime()));
+
+	        repositoryUser.save(entityUser);
+
+	        response.success();
+	        response.listMessage.add("Perfil actualizado correctamente.");
+	    } catch (Exception e) {
+	        response.exception();
+	        response.listMessage.add("Error al actualizar el perfil: " + e.getMessage());
+	    }
+
+	    return response;
+	}
+
+	public ResponseUserGetAll updatePassword(RequestUserUpdatePassword request) {
+		ResponseUserGetAll response = new ResponseUserGetAll();
+	    try {
+	        Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
+
+	        if (optionalUser.isEmpty()) {
+	            response.error();
+	            response.listMessage.add("No se encontró el usuario con el ID proporcionado.");
+	            return response;
+	        }
+
+	        EntityUser entityUser = optionalUser.get();
+
+	        String hashedPassword = passwordEncoder.encode(request.getPassword());
+
+	        entityUser.setPassword(hashedPassword);
+	        entityUser.setUpdatedAt(new java.sql.Date(new java.util.Date().getTime()));
+
+	        repositoryUser.save(entityUser);
+
+	        response.success();
+	        response.listMessage.add("Contraseña actualizada correctamente.");
+	    } catch (Exception e) {
+	        response.exception();
+	        response.listMessage.add("Error al actualizar la contraseña: " + e.getMessage());
 	    }
 
 	    return response;

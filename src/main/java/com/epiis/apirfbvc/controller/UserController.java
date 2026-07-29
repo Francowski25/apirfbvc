@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.epiis.apirfbvc.business.BusinessUser;
 import com.epiis.apirfbvc.dto.request.RequestUserInsert;
+import com.epiis.apirfbvc.dto.request.RequestUserUpdatePassword;
+import com.epiis.apirfbvc.dto.request.RequestUserUpdateProfile;
 import com.epiis.apirfbvc.dto.response.ResponseUserDashboardKpi;
 import com.epiis.apirfbvc.dto.response.ResponseUserGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseUserInsert;
@@ -70,5 +72,53 @@ public class UserController {
 
 	    return ResponseEntity.ok(
 	            businessUser.getDashboardKpi(idUser));
+	}
+	
+	@PutMapping(path = "updateProfile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<ResponseUserGetAll> actionUpdateProfile(
+	        @Valid @ModelAttribute RequestUserUpdateProfile request, BindingResult bindingResult) {
+	    try {
+	    	ResponseUserGetAll response;
+
+	        if (bindingResult.hasErrors()) {
+	            response = new ResponseUserGetAll();
+	            bindingResult.getAllErrors()
+	                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+	            return ResponseEntity.ok(response);
+	        }
+
+	        response = businessUser.updateProfile(request);
+
+	        return ResponseEntity.ok(response);
+	    } catch (Exception e) {
+	    	ResponseUserGetAll response = new ResponseUserGetAll();
+	        response.exception();
+	        response.listMessage.add(e.getMessage());
+	        return ResponseEntity.ok(response);
+	    }
+	}
+
+	@PutMapping(path = "updatePassword", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<ResponseUserGetAll> actionUpdatePassword(
+	        @Valid @ModelAttribute RequestUserUpdatePassword request, BindingResult bindingResult) {
+	    try {
+	    	ResponseUserGetAll response;
+
+	        if (bindingResult.hasErrors()) {
+	            response = new ResponseUserGetAll();
+	            bindingResult.getAllErrors()
+	                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+	            return ResponseEntity.ok(response);
+	        }
+
+	        response = businessUser.updatePassword(request);
+
+	        return ResponseEntity.ok(response);
+	    } catch (Exception e) {
+	    	ResponseUserGetAll response = new ResponseUserGetAll();
+	        response.exception();
+	        response.listMessage.add(e.getMessage());
+	        return ResponseEntity.ok(response);
+	    }
 	}
 }

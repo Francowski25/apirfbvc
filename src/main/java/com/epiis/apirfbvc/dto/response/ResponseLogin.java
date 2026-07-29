@@ -13,6 +13,8 @@ public class ResponseLogin extends ResponseGeneric {
     private String idUser;
     private String firstName;
     private String surName;
+    private String cellPhone;
+    private String image;
     private String email;
     private String password;
     private String role;
