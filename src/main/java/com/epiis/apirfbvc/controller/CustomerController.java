@@ -1,5 +1,6 @@
 package com.epiis.apirfbvc.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,7 +20,7 @@ import jakarta.validation.Valid;
 @RequestMapping(path = "customer")
 public class CustomerController {
 	private final BusinessCustomer businessCustomer;
-	
+
 	public CustomerController(BusinessCustomer businessCustomer) {
 		this.businessCustomer = businessCustomer;
 	}
@@ -28,23 +29,23 @@ public class CustomerController {
 	public ResponseEntity<ResponseCustomerInsert> actionInsert(@Valid @RequestBody RequestCustomerInsert request) {
 		try {
 			ResponseCustomerInsert response = businessCustomer.insert(request);
-	        return ResponseEntity.ok(response);
-			
-		} catch(Exception e) {
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+		} catch (Exception e) {
 			ResponseCustomerInsert response = new ResponseCustomerInsert();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
-	
+
 	@GetMapping(path = "getall")
 	public ResponseEntity<ResponseCustomerGetAll> listUsers() {
 		return ResponseEntity.ok(businessCustomer.getAll());
 	}
-	
+
 	@GetMapping(path = "report/frequent")
 	public ResponseEntity<ResponseCustomerReport> getReportFrequent() {
-	    return ResponseEntity.ok(businessCustomer.getReportFrequent());
+		return ResponseEntity.ok(businessCustomer.getReportFrequent());
 	}
 }

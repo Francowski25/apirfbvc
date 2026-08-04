@@ -11,9 +11,12 @@ import lombok.Setter;
 @Setter
 public class ResponseLogin extends ResponseGeneric {
     private String idUser;
+	private String token;
+	private String refreshToken;
     private String firstName;
     private String surName;
     private String cellPhone;
+    private String dni;
     private String image;
     private String email;
     private String password;

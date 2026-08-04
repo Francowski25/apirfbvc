@@ -14,7 +14,8 @@ public interface RepositoryLot extends JpaRepository<EntityLot, String> {
     
     List<EntityLot> findByExpirationDateBetween(LocalDate start, LocalDate end);
     
-
+    List<EntityLot> findByProduct_IdProductAndCurrentStockGreaterThanOrderByExpirationDateAsc(String idProduct, int stock);
+    
     boolean existsByCode(String code);
 
 }

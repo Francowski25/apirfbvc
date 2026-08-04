@@ -1,5 +1,6 @@
 package com.epiis.apirfbvc.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -24,63 +25,67 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping(path = "laboratories")
 public class LaboratoryController {
-	final private BusinessLaboratory businessLaboratory;
+
+	private final BusinessLaboratory businessLaboratory;
 
 	public LaboratoryController(BusinessLaboratory businessLaboratory) {
 		this.businessLaboratory = businessLaboratory;
 	}
-	
+
 	@PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ResponseLaboratoryInsert> actionInsert(@Valid @ModelAttribute RequestLaboratoryInsert request, BindingResult bindingResult) {
+	public ResponseEntity<ResponseLaboratoryInsert> actionInsert(
+			@Valid @ModelAttribute RequestLaboratoryInsert request, BindingResult bindingResult) {
 		try {
-			ResponseLaboratoryInsert response;
-			
 			if (bindingResult.hasErrors()) {
-				response = new ResponseLaboratoryInsert();
-				
+				ResponseLaboratoryInsert response = new ResponseLaboratoryInsert();
 				bindingResult.getAllErrors()
-                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-				
-				return ResponseEntity.ok(response);
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 			}
-			
-			response = businessLaboratory.insert(request);
-			
-			return ResponseEntity.ok(response);
-		} catch(Exception e) {
+
+			ResponseLaboratoryInsert response = businessLaboratory.insert(request);
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
+
+		} catch (Exception e) {
 			ResponseLaboratoryInsert response = new ResponseLaboratoryInsert();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
-	
+
 	@GetMapping(path = "getall")
-	public ResponseEntity<ResponseLaboratoryGetAll> listCategories(){
-		return ResponseEntity.ok(businessLaboratory.getAll());
+	public ResponseEntity<ResponseLaboratoryGetAll> listCategories() {
+		try {
+			ResponseLaboratoryGetAll response = businessLaboratory.getAll();
+			return ResponseEntity.ok(response);
+		} catch (Exception e) {
+			ResponseLaboratoryGetAll response = new ResponseLaboratoryGetAll();
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+		}
 	}
 
 	@GetMapping(path = "detail")
 	public ResponseEntity<ResponseLaboratoryDetail> actionDetail(
 			@Valid @ModelAttribute RequestLaboratoryDetail request, BindingResult bindingResult) {
 		try {
-			ResponseLaboratoryDetail response;
-
 			if (bindingResult.hasErrors()) {
-				response = new ResponseLaboratoryDetail();
+				ResponseLaboratoryDetail response = new ResponseLaboratoryDetail();
 				bindingResult.getAllErrors()
-					.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-				return ResponseEntity.ok(response);
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 			}
 
-			response = businessLaboratory.getDetail(request);
-
+			ResponseLaboratoryDetail response = businessLaboratory.getDetail(request);
 			return ResponseEntity.ok(response);
+
 		} catch (Exception e) {
 			ResponseLaboratoryDetail response = new ResponseLaboratoryDetail();
 			response.exception();
 			response.listMessage.add(e.getMessage());
-			return ResponseEntity.ok(response);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
 
@@ -94,8 +99,7 @@ public class LaboratoryController {
 			ResponseLaboratoryStatus response = new ResponseLaboratoryStatus();
 			response.exception();
 			response.listMessage.add(e.getMessage());
-			return ResponseEntity.ok(response);
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
-	
 }

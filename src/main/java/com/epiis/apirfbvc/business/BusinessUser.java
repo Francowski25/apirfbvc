@@ -1,8 +1,7 @@
 package com.epiis.apirfbvc.business;
 
-import java.io.IOException;
-import java.time.LocalDate;
 import java.math.BigDecimal;
+import java.time.LocalDate;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.HashMap;
@@ -10,8 +9,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import com.epiis.apirfbvc.dto.request.RequestUserInsert;
@@ -25,45 +24,86 @@ import com.epiis.apirfbvc.entity.EntityUser;
 import com.epiis.apirfbvc.repository.RepositoryLot;
 import com.epiis.apirfbvc.repository.RepositorySale;
 import com.epiis.apirfbvc.repository.RepositoryUser;
-import org.springframework.security.crypto.password.PasswordEncoder;
 
 @Service
 public class BusinessUser {
+
+	private static final String STATUS_ACTIVO = "activo";
+	private static final String DEFAULT_AVATAR = "avatar.png";
+	private static final String STATUS_COMPLETADA = "Completada";
+	private static final String EMPTY = "";
+
+	private static final String KEY_ID_USER = "idUser";
+	private static final String KEY_DNI = "dni";
+	private static final String KEY_IMAGE = "image";
+	private static final String KEY_FIRST_NAME = "firstName";
+	private static final String KEY_SUR_NAME = "surName";
+	private static final String KEY_CELL_PHONE = "cellPhone";
+	private static final String KEY_EMAIL = "email";
+	private static final String KEY_ROLE = "role";
+	private static final String KEY_STATUS = "status";
+	private static final String KEY_MIS_VENTAS_HOY = "misVentasHoy";
+	private static final String KEY_MONTO_VENDIDO_HOY = "montoVendidoHoy";
+	private static final String KEY_TICKET_PROMEDIO = "ticketPromedio";
+	private static final String KEY_STOCK_CRITICO = "stockCritico";
+
+	private static final String MSG_DNI_EXISTE = "El DNI ya se encuentra registrado en el sistema.";
+	private static final String MSG_EMAIL_EXISTE = "El correo electrónico ya se encuentra registrado en el sistema.";
+	private static final String MSG_REGISTRO_OK = "Registro realizado correctamente.";
+	private static final String MSG_USUARIO_NO_ENCONTRADO = "No se encontró el usuario con el ID proporcionado.";
+	private static final String MSG_ESTADO_OK = "Estado del usuario actualizado a '%s' correctamente.";
+	private static final String MSG_ERROR_ESTADO = "Error al actualizar el estado: ";
+	private static final String MSG_ERROR_KPIS = "Error al obtener KPIs: ";
+	private static final String MSG_EMAIL_EN_USO = "El correo ya está en uso por otro usuario.";
+	private static final String MSG_PERFIL_OK = "Perfil actualizado correctamente.";
+	private static final String MSG_ERROR_PERFIL = "Error al actualizar el perfil: ";
+	private static final String MSG_ACTUALIZACION_OK = "Contraseña actualizada correctamente.";
+	private static final String MSG_ERROR_ACTUALIZACION = "Error al actualizar la contraseña: ";
+
 	private final RepositoryUser repositoryUser;
-    private final PasswordEncoder passwordEncoder;
-    private final RepositorySale repositorySale;
-    private final RepositoryLot repositoryLot;
-	
+	private final PasswordEncoder passwordEncoder;
+	private final RepositorySale repositorySale;
+	private final RepositoryLot repositoryLot;
+
 	public BusinessUser(
 			RepositoryUser repositoryUser,
 			RepositorySale repositorySale,
-            PasswordEncoder passwordEncoder,
-            RepositoryLot repositoryLot
-	) {
+			PasswordEncoder passwordEncoder,
+			RepositoryLot repositoryLot) {
 		this.repositoryUser = repositoryUser;
 		this.passwordEncoder = passwordEncoder;
 		this.repositorySale = repositorySale;
 		this.repositoryLot = repositoryLot;
 	}
-	
-	public ResponseUserInsert insert(RequestUserInsert request) throws IOException {
+
+	public ResponseUserInsert insert(RequestUserInsert request) {
 		ResponseUserInsert response = new ResponseUserInsert();
-		
+
 		if (request.getDni() != null && repositoryUser.existsByDni(request.getDni())) {
-	        response.error();
-	        response.listMessage.add("El DNI ya se encuentra registrado en el sistema.");
-	        return response;
-	    }
-	    
-	    if (request.getEmail() != null && repositoryUser.existsByEmail(request.getEmail())) {
-	        response.error();
-	        response.listMessage.add("El correo electrónico ya se encuentra registrado en el sistema.");
-	        return response;
-	    }
-		
+			response.error();
+			response.listMessage.add(MSG_DNI_EXISTE);
+			return response;
+		}
+
+		if (request.getEmail() != null && repositoryUser.existsByEmail(request.getEmail())) {
+			response.error();
+			response.listMessage.add(MSG_EMAIL_EXISTE);
+			return response;
+		}
+
+		EntityUser entityUser = buildEntityUser(request);
+		repositoryUser.save(entityUser);
+
+		response.success();
+		response.listMessage.add(MSG_REGISTRO_OK);
+
+		return response;
+	}
+
+	private EntityUser buildEntityUser(RequestUserInsert request) {
 		EntityUser entityUser = new EntityUser();
-		
-		entityUser.setImage(request.getImage() == null ? "avatar.png" : request.getImage());		
+
+		entityUser.setImage(request.getImage() == null ? DEFAULT_AVATAR : request.getImage());
 		entityUser.setIdUser(UUID.randomUUID().toString());
 		entityUser.setDni(request.getDni());
 		entityUser.setFirstName(request.getFirstName());
@@ -71,200 +111,187 @@ public class BusinessUser {
 		entityUser.setEmail(request.getEmail());
 		entityUser.setCellPhone(request.getCellPhone());
 		entityUser.setRole(request.getRole());
-		entityUser.setStatus("activo");
-		
+		entityUser.setStatus(STATUS_ACTIVO);
+
 		String password = request.getPassword();
-		entityUser.setPassword(passwordEncoder.encode(password != null ? password : ""));
-		
+		entityUser.setPassword(passwordEncoder.encode(password != null ? password : EMPTY));
+
 		entityUser.setCreatedAt(new java.sql.Date(new Date().getTime()));
 		entityUser.setUpdatedAt(entityUser.getCreatedAt());
 
-		repositoryUser.save(entityUser);
-		
-		response.success();
-		response.listMessage.add("Registro realizado correctamente.");
-		
-		return response;
+		return entityUser;
 	}
-	
+
 	public ResponseUserGetAll getAll() {
 		ResponseUserGetAll response = new ResponseUserGetAll();
-		
-		List<EntityUser> listEntityUsers = repositoryUser.findAll();
-		
-		for(EntityUser item: listEntityUsers) {
-			Map<String, String> data = new HashMap<>();
-			
-			data.put("idUser", item.getIdUser());
-			data.put("dni", item.getDni());		
-			data.put("image", item.getImage());
-			data.put("firstName", item.getFirstName());
-			data.put("surName", item.getSurName());
-			data.put("cellPhone", item.getCellPhone());		
-			data.put("email", item.getEmail());
-			data.put("role", item.getRole());
-			data.put("status", item.getStatus());
-			
-			response.getListUsers().add(data);
+
+		for (EntityUser item : repositoryUser.findAll()) {
+			response.getListUsers().add(toMap(item));
 		}
-		
+
 		response.success();
-		
 		return response;
+	}
+
+	private Map<String, String> toMap(EntityUser item) {
+		Map<String, String> data = new HashMap<>();
+		data.put(KEY_ID_USER, item.getIdUser());
+		data.put(KEY_DNI, item.getDni());
+		data.put(KEY_IMAGE, item.getImage());
+		data.put(KEY_FIRST_NAME, item.getFirstName());
+		data.put(KEY_SUR_NAME, item.getSurName());
+		data.put(KEY_CELL_PHONE, item.getCellPhone());
+		data.put(KEY_EMAIL, item.getEmail());
+		data.put(KEY_ROLE, item.getRole());
+		data.put(KEY_STATUS, item.getStatus());
+		return data;
 	}
 
 	public ResponseUserInsert updateUserStatus(String id, String newStatus) {
-	    ResponseUserInsert response = new ResponseUserInsert();
-	    try {
-	    	String safeId = id != null ? id : "";
-	        String safeStatus = newStatus != null ? newStatus.toLowerCase() : "activo";
-	        
-	        Optional<EntityUser> optionalUser = repositoryUser.findById(safeId);
-	        
-	        if (optionalUser.isPresent()) {
-	            EntityUser user = optionalUser.get();
-	            
-	            user.setStatus(safeStatus);
-	            user.setUpdatedAt(new java.sql.Date(new java.util.Date().getTime()));
-	            
-	            repositoryUser.save(user);
-	            
-	            response.success();
-	            response.listMessage.add("Estado del usuario actualizado a '" + safeStatus + "' correctamente.");
-	        } else {
-	            response.error();
-	            response.listMessage.add("No se encontró el usuario con el ID proporcionado.");
-	        }
-	    } catch (Exception e) {
-	        response.exception();
-	        response.listMessage.add("Error al actualizar el estado: " + e.getMessage());
-	    }
-	    
-	    return response;
+		ResponseUserInsert response = new ResponseUserInsert();
+		try {
+			String safeId = id != null ? id : EMPTY;
+			String safeStatus = newStatus != null ? newStatus.toLowerCase() : STATUS_ACTIVO;
+
+			Optional<EntityUser> optionalUser = repositoryUser.findById(safeId);
+
+			if (optionalUser.isPresent()) {
+				EntityUser user = optionalUser.get();
+
+				user.setStatus(safeStatus);
+				user.setUpdatedAt(new java.sql.Date(new Date().getTime()));
+
+				repositoryUser.save(user);
+
+				response.success();
+				response.listMessage.add(String.format(MSG_ESTADO_OK, safeStatus));
+			} else {
+				response.error();
+				response.listMessage.add(MSG_USUARIO_NO_ENCONTRADO);
+			}
+		} catch (Exception e) {
+			response.exception();
+			response.listMessage.add(MSG_ERROR_ESTADO + e.getMessage());
+		}
+
+		return response;
 	}
-	
+
 	public ResponseUserDashboardKpi getDashboardKpi(String idUser) {
+		ResponseUserDashboardKpi response = new ResponseUserDashboardKpi();
 
-	    ResponseUserDashboardKpi response = new ResponseUserDashboardKpi();
+		try {
+			LocalDate hoy = LocalDate.now();
 
-	    try {
+			List<EntitySale> ventasHoy = repositorySale.findAll().stream()
+					.filter(s -> STATUS_COMPLETADA.equals(s.getStatus()))
+					.filter(s -> s.getUser() != null)
+					.filter(s -> s.getUser().getIdUser().equals(idUser))
+					.filter(s -> s.getSaleDate() != null)
+					.filter(s -> toLocalDate(s.getSaleDate()).equals(hoy))
+					.toList();
 
-	        LocalDate hoy = LocalDate.now();
+			double montoVendido = ventasHoy.stream()
+					.map(EntitySale::getTotal)
+					.mapToDouble(BigDecimal::doubleValue)
+					.sum();
 
-	        List<EntitySale> ventasHoy = repositorySale.findAll().stream()
-	                .filter(s -> "Completada".equals(s.getStatus()))
-	                .filter(s -> s.getUser() != null)
-	                .filter(s -> s.getUser().getIdUser().equals(idUser))
-	                .filter(s -> s.getSaleDate() != null)
-	                .filter(s -> s.getSaleDate().toInstant()
-	                        .atZone(ZoneId.systemDefault())
-	                        .toLocalDate()
-	                        .equals(hoy))
-	                .collect(Collectors.toList());
+			double ticketPromedio = ventasHoy.isEmpty() ? 0 : montoVendido / ventasHoy.size();
 
-	        double montoVendido = ventasHoy.stream()
-	                .map(EntitySale::getTotal)
-	                .mapToDouble(BigDecimal::doubleValue)
-	                .sum();
+			long stockCritico = repositoryLot.findAll().stream()
+					.filter(l -> l.getProduct() != null)
+					.filter(l -> l.getCurrentStock() != null)
+					.filter(l -> l.getCurrentStock() <= l.getProduct().getStockMinimum())
+					.count();
 
-	        double ticketPromedio =
-	                ventasHoy.isEmpty()
-	                ? 0
-	                : montoVendido / ventasHoy.size();
+			Map<String, Object> resumen = new HashMap<>();
+			resumen.put(KEY_MIS_VENTAS_HOY, ventasHoy.size());
+			resumen.put(KEY_MONTO_VENDIDO_HOY, montoVendido);
+			resumen.put(KEY_TICKET_PROMEDIO, ticketPromedio);
+			resumen.put(KEY_STOCK_CRITICO, stockCritico);
 
-	        long stockCritico = repositoryLot.findAll().stream()
-	                .filter(l -> l.getProduct() != null)
-	                .filter(l -> l.getCurrentStock() != null)
-	                .filter(l -> l.getCurrentStock() <= l.getProduct().getStockMinimum())
-	                .count();
+			response.setResumen(resumen);
+			response.success();
 
-	        Map<String, Object> resumen = new HashMap<>();
+		} catch (Exception e) {
+			response.listMessage.add(MSG_ERROR_KPIS + e.getMessage());
+		}
 
-	        resumen.put("misVentasHoy", ventasHoy.size());
-	        resumen.put("montoVendidoHoy", montoVendido);
-	        resumen.put("ticketPromedio", ticketPromedio);
-	        resumen.put("stockCritico", stockCritico);
+		return response;
+	}
 
-	        response.setResumen(resumen);
-
-	        response.success();
-
-	    } catch (Exception e) {
-	        response.listMessage.add("Error al obtener KPIs: " + e.getMessage());
-	    }
-
-	    return response;
+	private LocalDate toLocalDate(Date date) {
+		return date.toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 	}
 
 	public ResponseUserGetAll updateProfile(RequestUserUpdateProfile request) {
-	    ResponseUserGetAll response = new ResponseUserGetAll();
-	    try {
-	        Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
+		ResponseUserGetAll response = new ResponseUserGetAll();
+		try {
+			Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
 
-	        if (optionalUser.isEmpty()) {
-	            response.error();
-	            response.listMessage.add("No se encontró el usuario con el ID proporcionado.");
-	            return response;
-	        }
+			if (optionalUser.isEmpty()) {
+				return userNotFound(response);
+			}
 
-	        EntityUser entityUser = optionalUser.get();
+			EntityUser entityUser = optionalUser.get();
 
-	        boolean emailInUse = repositoryUser.existsByEmailAndIdUserNot(request.getEmail(), request.getIdUser());
-	        if (emailInUse) {
-	            response.warning();
-	            response.listMessage.add("El correo ya está en uso por otro usuario.");
-	            return response;
-	        }
+			if (repositoryUser.existsByEmailAndIdUserNot(request.getEmail(), request.getIdUser())) {
+				response.warning();
+				response.listMessage.add(MSG_EMAIL_EN_USO);
+				return response;
+			}
 
-	        if (request.getImage() != null && !request.getImage().trim().isEmpty()) {
-	            entityUser.setImage(request.getImage());
-	        }
+			if (request.getImage() != null && !request.getImage().trim().isEmpty()) {
+				entityUser.setImage(request.getImage());
+			}
 
-	        entityUser.setFirstName(request.getFirstName());
-	        entityUser.setSurName(request.getSurName());
-	        entityUser.setEmail(request.getEmail());
-	        entityUser.setCellPhone(request.getCellPhone());
-	        entityUser.setUpdatedAt(new java.sql.Date(new java.util.Date().getTime()));
+			entityUser.setFirstName(request.getFirstName());
+			entityUser.setSurName(request.getSurName());
+			entityUser.setEmail(request.getEmail());
+			entityUser.setCellPhone(request.getCellPhone());
+			entityUser.setUpdatedAt(new java.sql.Date(new Date().getTime()));
 
-	        repositoryUser.save(entityUser);
+			repositoryUser.save(entityUser);
 
-	        response.success();
-	        response.listMessage.add("Perfil actualizado correctamente.");
-	    } catch (Exception e) {
-	        response.exception();
-	        response.listMessage.add("Error al actualizar el perfil: " + e.getMessage());
-	    }
+			response.success();
+			response.listMessage.add(MSG_PERFIL_OK);
+		} catch (Exception e) {
+			response.exception();
+			response.listMessage.add(MSG_ERROR_PERFIL + e.getMessage());
+		}
 
-	    return response;
+		return response;
 	}
 
 	public ResponseUserGetAll updatePassword(RequestUserUpdatePassword request) {
 		ResponseUserGetAll response = new ResponseUserGetAll();
-	    try {
-	        Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
+		try {
+			Optional<EntityUser> optionalUser = repositoryUser.findById(request.getIdUser());
 
-	        if (optionalUser.isEmpty()) {
-	            response.error();
-	            response.listMessage.add("No se encontró el usuario con el ID proporcionado.");
-	            return response;
-	        }
+			if (optionalUser.isEmpty()) {
+				return userNotFound(response);
+			}
 
-	        EntityUser entityUser = optionalUser.get();
+			EntityUser entityUser = optionalUser.get();
 
-	        String hashedPassword = passwordEncoder.encode(request.getPassword());
+			entityUser.setPassword(passwordEncoder.encode(request.getPassword()));
+			entityUser.setUpdatedAt(new java.sql.Date(new Date().getTime()));
 
-	        entityUser.setPassword(hashedPassword);
-	        entityUser.setUpdatedAt(new java.sql.Date(new java.util.Date().getTime()));
+			repositoryUser.save(entityUser);
 
-	        repositoryUser.save(entityUser);
+			response.success();
+			response.listMessage.add(MSG_ACTUALIZACION_OK);
+		} catch (Exception e) {
+			response.exception();
+			response.listMessage.add(MSG_ERROR_ACTUALIZACION + e.getMessage());
+		}
 
-	        response.success();
-	        response.listMessage.add("Contraseña actualizada correctamente.");
-	    } catch (Exception e) {
-	        response.exception();
-	        response.listMessage.add("Error al actualizar la contraseña: " + e.getMessage());
-	    }
+		return response;
+	}
 
-	    return response;
+	private ResponseUserGetAll userNotFound(ResponseUserGetAll response) {
+		response.error();
+		response.listMessage.add(MSG_USUARIO_NO_ENCONTRADO);
+		return response;
 	}
 }

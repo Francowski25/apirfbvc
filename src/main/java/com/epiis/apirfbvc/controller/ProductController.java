@@ -1,5 +1,6 @@
 package com.epiis.apirfbvc.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -22,42 +23,43 @@ import jakarta.validation.Valid;
 public class ProductController {
 	private final BusinessProduct businessProduct;
 
-    public ProductController(BusinessProduct businessProduct) {
+	public ProductController(BusinessProduct businessProduct) {
 		this.businessProduct = businessProduct;
 	}
-    
-    @PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ResponseProductInsert> actionInsert(@Valid @ModelAttribute RequestProductInsert request, BindingResult bindingResult) {
+
+	@PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+	public ResponseEntity<ResponseProductInsert> actionInsert(@Valid @ModelAttribute RequestProductInsert request,
+			BindingResult bindingResult) {
 		try {
 			ResponseProductInsert response;
-			
+
 			if (bindingResult.hasErrors()) {
 				response = new ResponseProductInsert();
-				
+
 				bindingResult.getAllErrors()
-                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-				
-				return ResponseEntity.ok(response);
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 			}
-			
+
 			response = businessProduct.insert(request);
-			
-			return ResponseEntity.ok(response);
-		} catch(Exception e) {
+
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
+		} catch (Exception e) {
 			ResponseProductInsert response = new ResponseProductInsert();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
 
 	@GetMapping(path = "getall")
-    public ResponseEntity<ResponseProductGetAll> listProduct() {
-        return ResponseEntity.ok(businessProduct.getAll());
-    }
-	
+	public ResponseEntity<ResponseProductGetAll> listProduct() {
+		return ResponseEntity.ok(businessProduct.getAll());
+	}
+
 	@GetMapping(path = "stock-alert")
-    public ResponseEntity<ResponseProductStockAlert> getStockAlert() {
-        return ResponseEntity.ok(businessProduct.getStockAlert());
-    }
+	public ResponseEntity<ResponseProductStockAlert> getStockAlert() {
+		return ResponseEntity.ok(businessProduct.getStockAlert());
+	}
 }

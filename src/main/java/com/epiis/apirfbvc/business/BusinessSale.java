@@ -6,6 +6,7 @@ import java.time.LocalDate;
 import java.time.format.TextStyle;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -13,11 +14,13 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import com.epiis.apirfbvc.dto.request.RequestMovementCreate;
+import com.epiis.apirfbvc.dto.request.RequestMovementDetailItem;
 import com.epiis.apirfbvc.dto.request.RequestSaleSave;
+import com.epiis.apirfbvc.dto.response.ResponseMovementCreate;
 import com.epiis.apirfbvc.dto.response.ResponseSaleGetAll;
 import com.epiis.apirfbvc.dto.response.ResponseSaleKpi;
 import com.epiis.apirfbvc.dto.response.ResponseSaleRecent;
@@ -32,64 +35,40 @@ import com.epiis.apirfbvc.entity.EntitySale;
 import com.epiis.apirfbvc.entity.EntitySaleDetail;
 import com.epiis.apirfbvc.entity.EntityUser;
 import com.epiis.apirfbvc.repository.RepositoryCustomer;
-import com.epiis.apirfbvc.repository.RepositoryLot;
 import com.epiis.apirfbvc.repository.RepositorySale;
 import com.epiis.apirfbvc.repository.RepositorySaleDetail;
+import com.epiis.apirfbvc.repository.RepositoryUser;
+
+import lombok.RequiredArgsConstructor;
 
 @Service
+@RequiredArgsConstructor
 public class BusinessSale {
+
+    private static final String STATUS_COMPLETADA = "Completada";
+    private static final String SUCCESS = "success";
+    private static final BigDecimal IGV_RATE = BigDecimal.valueOf(0.18);
+    private static final int SCALE = 2;
 
     private final RepositorySale repositorySale;
     private final RepositorySaleDetail repositorySaleDetail;
-    private final RepositoryLot repositoryLot;
     private final RepositoryCustomer repositoryCustomer;
- 
-    public BusinessSale(RepositorySale repositorySale, RepositorySaleDetail repositorySaleDetail,
-			RepositoryLot repositoryLot, RepositoryCustomer repositoryCustomer) {
-		this.repositorySale = repositorySale;
-		this.repositorySaleDetail = repositorySaleDetail;
-		this.repositoryLot = repositoryLot;
-		this.repositoryCustomer = repositoryCustomer;
-	}
+    private final RepositoryUser repositoryUser;
+    private final BusinessMovement businessMovement;
 
-	public ResponseSaleGetAll getAll() {
+    public ResponseSaleGetAll getAll() {
         ResponseSaleGetAll response = new ResponseSaleGetAll();
 
         List<EntitySale> ventas = repositorySale.findAll()
-            .stream()
-            .sorted((a, b) -> b.getSaleDate().compareTo(a.getSaleDate()))
-            .collect(Collectors.toList());
+                .stream()
+                .sorted(Comparator.comparing(EntitySale::getSaleDate).reversed())
+                .toList();
 
         for (EntitySale s : ventas) {
             List<EntitySaleDetail> detalles = repositorySaleDetail.findBySale_IdSale(s.getIdSale());
+            List<Map<String, String>> detallesMap = mapDetailsToMap(detalles);
 
-            List<Map<String, String>> detallesMap = detalles.stream().map(d -> {
-                Map<String, String> det = new HashMap<>();
-                det.put("idSaleDetail", d.getIdSaleDetail());
-                det.put("productName", d.getProduct() != null ? d.getProduct().getName() : "—");
-                det.put("lotCode", d.getLot() != null ? d.getLot().getCode() : "—");
-                det.put("quantity", String.valueOf(d.getQuantity()));
-                det.put("unitPrice", d.getUnitPrice() != null ? d.getUnitPrice().toString() : "0");
-                det.put("subtotal", d.getSubtotal() != null ? d.getSubtotal().toString() : "0");
-                return det;
-            }).collect(Collectors.toList());
-
-            Map<String, Object> data = new HashMap<>();
-            data.put("idSale", s.getIdSale());
-            data.put("saleNumber", s.getSaleNumber());
-            data.put("saleDate", s.getSaleDate() != null ? s.getSaleDate().toString() : "");
-            data.put("customerName", s.getCustomer() != null ? s.getCustomer().getName() : "—");
-            data.put("customerDocument", s.getCustomer() != null ? s.getCustomer().getDocumentNumber() : "—");
-            data.put("userName", s.getUser() != null
-                ? s.getUser().getFirstName() + " " + s.getUser().getSurName() : "—");
-            data.put("subtotal", s.getSubtotal() != null ? s.getSubtotal().toString() : "0");
-            data.put("discount", s.getDiscount() != null ? s.getDiscount().toString() : "0");
-            data.put("igv", s.getIgv() != null ? s.getIgv().toString() : "0");
-            data.put("total", s.getTotal() != null ? s.getTotal().toString() : "0");
-            data.put("paymentMethod", s.getPaymentMethod());
-            data.put("status", s.getStatus());
-            data.put("detalles", detallesMap);
-
+            Map<String, Object> data = buildSaleMap(s, detallesMap);
             response.getListSales().add(data);
         }
 
@@ -97,88 +76,185 @@ public class BusinessSale {
         return response;
     }
 
+    private List<Map<String, String>> mapDetailsToMap(List<EntitySaleDetail> detalles) {
+        return detalles.stream().map(d -> {
+            Map<String, String> det = new HashMap<>();
+            det.put(BusinessUtils.KEY_ID_SALE_DETAIL, d.getIdSaleDetail());
+            det.put(BusinessUtils.KEY_PRODUCT_NAME, getNameOrDefault(d.getProduct()));
+            det.put(BusinessUtils.KEY_LOT_CODE, d.getLot() != null ? d.getLot().getCode() : BusinessUtils.DEFAULT_VALUE);
+            det.put(BusinessUtils.KEY_QUANTITY, String.valueOf(d.getQuantity()));
+            det.put(BusinessUtils.KEY_UNIT_COST, BusinessUtils.formatBigDecimal(d.getUnitPrice()));
+            det.put(BusinessUtils.KEY_SUBTOTAL, BusinessUtils.formatBigDecimal(d.getSubtotal()));
+            return det;
+        }).toList();
+    }
+
+    private Map<String, Object> buildSaleMap(EntitySale s, List<Map<String, String>> detallesMap) {
+        Map<String, Object> data = new HashMap<>();
+        data.put(BusinessUtils.KEY_ID_SALE, s.getIdSale());
+        data.put(BusinessUtils.KEY_SALE_NUMBER, s.getSaleNumber());
+        data.put(BusinessUtils.KEY_SALE_DATE, BusinessUtils.formatDate(s.getSaleDate()));
+        data.put(BusinessUtils.KEY_CUSTOMER_NAME, getCustomerName(s));
+        data.put("customerDocument", s.getCustomer() != null ? s.getCustomer().getDocumentNumber() : BusinessUtils.DEFAULT_VALUE);
+        data.put(BusinessUtils.KEY_USER_NAME, BusinessUtils.buildFullName(s.getUser()));
+        data.put(BusinessUtils.KEY_SUBTOTAL, BusinessUtils.formatBigDecimal(s.getSubtotal()));
+        data.put(BusinessUtils.KEY_DISCOUNT, BusinessUtils.formatBigDecimal(s.getDiscount()));
+        data.put(BusinessUtils.KEY_IGV, BusinessUtils.formatBigDecimal(s.getIgv()));
+        data.put(BusinessUtils.KEY_TOTAL, BusinessUtils.formatBigDecimal(s.getTotal()));
+        data.put(BusinessUtils.KEY_PAYMENT_METHOD, s.getPaymentMethod());
+        data.put("status", s.getStatus());
+        data.put(BusinessUtils.KEY_DETALLES, detallesMap);
+        return data;
+    }
+
+    private String getNameOrDefault(EntityProduct product) {
+        return product != null ? product.getName() : BusinessUtils.DEFAULT_VALUE;
+    }
+
+    private String getCustomerName(EntitySale sale) {
+        return sale.getCustomer() != null ? sale.getCustomer().getName() : BusinessUtils.DEFAULT_VALUE;
+    }
+
     public ResponseSaleSave save(RequestSaleSave request) {
         ResponseSaleSave response = new ResponseSaleSave();
 
+        try {
+            ResponseSaleSave validation = validateSaveRequest(request);
+            if (validation != null) {
+                return validation;
+            }
+
+            EntityCustomer customerRef = resolveCustomer(request.getIdCustomer());
+            if (customerRef == null && BusinessUtils.isNotBlank(request.getIdCustomer())) {
+                response.error();
+                response.listMessage.add(BusinessUtils.MSG_CLIENTE_NO_ENCONTRADO);
+                return response;
+            }
+
+            BigDecimal subtotal = calculateSubtotal(request.getItems());
+            BigDecimal discount = BigDecimal.valueOf(request.getDiscount() != null ? request.getDiscount() : 0);
+            BigDecimal[] totals = calculateTotals(subtotal, discount);
+
+            String saleNumber = generateSaleNumber();
+
+            ResponseMovementCreate movementResponse = processMovement(request, saleNumber);
+            if (!SUCCESS.equals(movementResponse.getType())) {
+                response.error();
+                response.listMessage.addAll(movementResponse.listMessage);
+                return response;
+            }
+
+            persistSale(request, saleNumber, subtotal, discount, totals[0], totals[1], customerRef);
+
+            response.success();
+            response.listMessage.add(BusinessUtils.MSG_VENTA_REGISTRADA + saleNumber);
+
+        } catch (RuntimeException e) {
+            response.exception();
+            response.listMessage.add(BusinessUtils.MSG_ERROR_REGISTRAR_VENTA + e.getMessage());
+        }
+
+        return response;
+    }
+
+    private ResponseSaleSave validateSaveRequest(RequestSaleSave request) {
+        ResponseSaleSave response = new ResponseSaleSave();
+
         if (request.getItems() == null || request.getItems().isEmpty()) {
+            response.error();
             response.listMessage.add("Debe agregar al menos un producto.");
             return response;
         }
 
-        for (RequestSaleSave.SaleItem item : request.getItems()) {
-        	String idLot = item.getIdLot();
-
-        	if (idLot == null || idLot.isBlank()) {
-        	    response.listMessage.add("El lote es obligatorio.");
-        	    return response;
-        	}
-
-        	EntityLot lot = repositoryLot.findById(idLot).orElse(null);
-
-        	if (lot == null) {
-        	    response.listMessage.add("Lote no encontrado: " + idLot);
-        	    return response;
-        	}
+        if (repositoryUser.findById(request.getIdUser()).isEmpty()) {
+            response.error();
+            response.listMessage.add("Usuario no encontrado.");
+            return response;
         }
 
+        return null;
+    }
+
+    private EntityCustomer resolveCustomer(String idCustomer) {
+        if (BusinessUtils.isNotBlank(idCustomer)) {
+            return repositoryCustomer.findById(idCustomer).orElse(null);
+        }
+        return null;
+    }
+
+    private BigDecimal calculateSubtotal(List<RequestSaleSave.SaleItem> items) {
         BigDecimal subtotal = BigDecimal.ZERO;
-        for (RequestSaleSave.SaleItem item : request.getItems()) {
-            BigDecimal itemSubtotal = BigDecimal.valueOf(item.getUnitPrice())
-                .multiply(BigDecimal.valueOf(item.getQuantity()));
-            subtotal = subtotal.add(itemSubtotal);
+        for (RequestSaleSave.SaleItem item : items) {
+            subtotal = subtotal.add(BigDecimal.valueOf(item.getUnitPrice())
+                    .multiply(BigDecimal.valueOf(item.getQuantity())));
         }
+        return subtotal;
+    }
 
-        BigDecimal discount = BigDecimal.valueOf(request.getDiscount() != null ? request.getDiscount() : 0);
+    private BigDecimal[] calculateTotals(BigDecimal subtotal, BigDecimal discount) {
         BigDecimal base = subtotal.subtract(discount);
-        BigDecimal igv = base.multiply(BigDecimal.valueOf(0.18)).setScale(2, RoundingMode.HALF_UP);
-        BigDecimal total = base.add(igv).setScale(2, RoundingMode.HALF_UP);
+        BigDecimal igv = base.multiply(IGV_RATE).setScale(SCALE, RoundingMode.HALF_UP);
+        BigDecimal total = base.add(igv).setScale(SCALE, RoundingMode.HALF_UP);
+        return new BigDecimal[] { igv, total };
+    }
 
-        long count = repositorySale.count() + 1;
-        String saleNumber = String.format("V%06d", count);
+    private ResponseMovementCreate processMovement(RequestSaleSave request, String saleNumber) {
+        RequestMovementCreate movementRequest = new RequestMovementCreate();
+        movementRequest.setType(BusinessUtils.TYPE_SALIDA);
+        movementRequest.setObservation("Venta N° " + saleNumber);
+        movementRequest.setIdUser(request.getIdUser());
 
+        List<RequestMovementDetailItem> movementDetails = request.getItems().stream().map(item -> {
+            RequestMovementDetailItem detailItem = new RequestMovementDetailItem();
+            detailItem.setIdProduct(item.getIdProduct());
+            detailItem.setIdLot(item.getIdLot());
+            detailItem.setQuantity(item.getQuantity());
+            return detailItem;
+        }).toList();
+
+        movementRequest.setDetails(movementDetails);
+        return businessMovement.create(movementRequest);
+    }
+
+    private void persistSale(RequestSaleSave request, String saleNumber, BigDecimal subtotal,
+            BigDecimal discount, BigDecimal igv, BigDecimal total, EntityCustomer customerRef) {
+        EntitySale sale = buildSaleEntity(request, saleNumber, subtotal, discount, igv, total, customerRef);
+        repositorySale.save(sale);
+        saveSaleDetails(sale, request.getItems());
+    }
+
+    private EntitySale buildSaleEntity(RequestSaleSave request, String saleNumber, BigDecimal subtotal,
+            BigDecimal discount, BigDecimal igv, BigDecimal total, EntityCustomer customerRef) {
         EntitySale sale = new EntitySale();
         sale.setIdSale(UUID.randomUUID().toString());
         sale.setSaleNumber(saleNumber);
         sale.setSaleDate(new Date());
-        sale.setSubtotal(subtotal.setScale(2, RoundingMode.HALF_UP));
-        sale.setDiscount(discount.setScale(2, RoundingMode.HALF_UP));
+        sale.setSubtotal(subtotal.setScale(SCALE, RoundingMode.HALF_UP));
+        sale.setDiscount(discount.setScale(SCALE, RoundingMode.HALF_UP));
         sale.setIgv(igv);
         sale.setTotal(total);
         sale.setPaymentMethod(request.getPaymentMethod());
-        sale.setStatus("Completada");
+        sale.setStatus(STATUS_COMPLETADA);
         sale.setCreatedAt(new java.sql.Date(new Date().getTime()));
         sale.setUpdatedAt(sale.getCreatedAt());
-
-        String idCustomer = request.getIdCustomer();
-
-        if (idCustomer != null && !idCustomer.isBlank()) {
-
-            EntityCustomer customerRef = repositoryCustomer
-                    .findById(idCustomer)
-                    .orElseThrow(() -> new RuntimeException("Cliente no encontrado."));
-
-            sale.setCustomer(customerRef);
-
-        } else {
-            sale.setCustomer(null);
-        }
+        sale.setCustomer(customerRef);
 
         EntityUser userRef = new EntityUser();
         userRef.setIdUser(request.getIdUser());
         sale.setUser(userRef);
 
-        repositorySale.save(sale);
+        return sale;
+    }
 
-        for (RequestSaleSave.SaleItem item : request.getItems()) {
-            BigDecimal itemSubtotal = BigDecimal.valueOf(item.getUnitPrice())
-                .multiply(BigDecimal.valueOf(item.getQuantity()))
-                .setScale(2, RoundingMode.HALF_UP);
-
+    private void saveSaleDetails(EntitySale sale, List<RequestSaleSave.SaleItem> items) {
+        for (RequestSaleSave.SaleItem item : items) {
             EntitySaleDetail detail = new EntitySaleDetail();
             detail.setIdSaleDetail(UUID.randomUUID().toString());
             detail.setQuantity(item.getQuantity());
             detail.setUnitPrice(BigDecimal.valueOf(item.getUnitPrice()));
-            detail.setSubtotal(itemSubtotal);
+            detail.setSubtotal(BigDecimal.valueOf(item.getUnitPrice())
+                    .multiply(BigDecimal.valueOf(item.getQuantity()))
+                    .setScale(SCALE, RoundingMode.HALF_UP));
             detail.setSale(sale);
 
             EntityProduct productRef = new EntityProduct();
@@ -190,27 +266,24 @@ public class BusinessSale {
             detail.setLot(lotRef);
 
             repositorySaleDetail.save(detail);
-            
-            String idLot = item.getIdLot();
-
-            if (idLot == null || idLot.isBlank()) {
-                continue;
-            }
-
-            EntityLot lot = repositoryLot.findById(idLot).orElse(null);
-
-            if (lot == null) {
-                continue;
-            }
-
-            lot.setCurrentStock(lot.getCurrentStock() - item.getQuantity());
-            lot.setUpdatedAt(new java.sql.Date(new Date().getTime()));
-            repositoryLot.save(lot);
         }
+    }
 
-        response.success();
-        response.listMessage.add("Venta registrada correctamente. N°: " + saleNumber);
-        return response;
+    private String generateSaleNumber() {
+        long count = repositorySale.count() + 1;
+
+        while (true) {
+            String candidate = String.format("V%06d", count);
+
+            boolean exists = repositorySale.findAll().stream()
+                    .anyMatch(s -> s.getSaleNumber().equals(candidate));
+
+            if (!exists) {
+                return candidate;
+            }
+
+            count++;
+        }
     }
 
     public ResponseSaleKpi getKpi() {
@@ -220,20 +293,26 @@ public class BusinessSale {
         Date inicioAyer = getStartOfDay(1);
         Date finAyer = inicioHoy;
 
-        List<EntitySale> ventasHoy = repositorySale.findBySaleDateGreaterThanEqualAndStatus(inicioHoy, "Completada");
-        List<EntitySale> ventasAyer = repositorySale.findBySaleDateBetweenAndStatus(inicioAyer, finAyer, "Completada");
+        List<EntitySale> ventasHoy = repositorySale.findBySaleDateGreaterThanEqualAndStatus(inicioHoy,
+                STATUS_COMPLETADA);
+        List<EntitySale> ventasAyer = repositorySale.findBySaleDateBetweenAndStatus(inicioAyer, finAyer,
+                STATUS_COMPLETADA);
 
-        double totalHoy = ventasHoy.stream().mapToDouble(s -> s.getTotal().doubleValue()).sum();
-        double totalAyer = ventasAyer.stream().mapToDouble(s -> s.getTotal().doubleValue()).sum();
+        double totalHoy = sumTotals(ventasHoy);
+        double totalAyer = sumTotals(ventasAyer);
 
         Map<String, Object> kpi = new HashMap<>();
-        kpi.put("ventasHoy", totalHoy);
-        kpi.put("ventasAyer", totalAyer);
-        kpi.put("transaccionesHoy", ventasHoy.size());
+        kpi.put(BusinessUtils.KEY_VENTAS_HOY, totalHoy);
+        kpi.put(BusinessUtils.KEY_VENTAS_AYER, totalAyer);
+        kpi.put(BusinessUtils.KEY_TRANSACCIONES_HOY, ventasHoy.size());
 
         response.setKpi(kpi);
         response.success();
         return response;
+    }
+
+    private double sumTotals(List<EntitySale> sales) {
+        return sales.stream().mapToDouble(s -> s.getTotal().doubleValue()).sum();
     }
 
     public ResponseSaleWeek getSalesWeek() {
@@ -244,17 +323,17 @@ public class BusinessSale {
             Date inicio = getStartOfDay(i);
             Date fin = getStartOfDay(i - 1);
 
-            List<EntitySale> ventasDia = repositorySale.findBySaleDateBetweenAndStatus(inicio, fin, "Completada");
-            double total = ventasDia.stream().mapToDouble(s -> s.getTotal().doubleValue()).sum();
+            List<EntitySale> ventasDia = repositorySale.findBySaleDateBetweenAndStatus(inicio, fin, STATUS_COMPLETADA);
+            double total = sumTotals(ventasDia);
 
             LocalDate fecha = LocalDate.now().minusDays(i);
             String diaNombre = fecha.getDayOfWeek()
                     .getDisplayName(TextStyle.SHORT, Locale.of("es", "ES"));
-            
+
             Map<String, Object> item = new HashMap<>();
-            item.put("dia", capitalize(diaNombre));
-            item.put("fecha", fecha.toString());
-            item.put("total", total);
+            item.put(BusinessUtils.KEY_DIA, capitalize(diaNombre));
+            item.put(BusinessUtils.KEY_FECHA, fecha.toString());
+            item.put(BusinessUtils.KEY_TOTAL, total);
             resultado.add(item);
         }
 
@@ -276,24 +355,20 @@ public class BusinessSale {
 
         for (EntitySaleDetail d : detalles) {
             String idProduct = d.getProduct().getIdProduct();
-            acumulado.merge(
-            	    idProduct,
-            	    d.getQuantity(),
-            	    (a, b) -> a + b
-            	);
+            acumulado.merge(idProduct, d.getQuantity(), Integer::sum);
             nombres.put(idProduct, d.getProduct().getName());
         }
 
         List<Map<String, Object>> resultado = acumulado.entrySet().stream()
-            .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
-            .limit(limit)
-            .map(e -> {
-                Map<String, Object> item = new HashMap<>();
-                item.put("productName", nombres.get(e.getKey()));
-                item.put("totalQty", e.getValue());
-                return item;
-            })
-            .collect(Collectors.toList());
+                .sorted(Map.Entry.<String, Integer>comparingByValue().reversed())
+                .limit(limit)
+                .map(e -> {
+                    Map<String, Object> item = new HashMap<>();
+                    item.put(BusinessUtils.KEY_PRODUCT_NAME, nombres.get(e.getKey()));
+                    item.put(BusinessUtils.KEY_TOTAL_QTY, e.getValue());
+                    return item;
+                })
+                .toList();
 
         response.setListTopProducts(resultado);
         response.success();
@@ -303,26 +378,28 @@ public class BusinessSale {
     public ResponseSaleRecent getRecent(int limit) {
         ResponseSaleRecent response = new ResponseSaleRecent();
 
-        List<EntitySale> ventas = repositorySale.findByStatusOrderBySaleDateDesc("Completada")
-            .stream()
-            .limit(limit)
-            .collect(Collectors.toList());
+        List<EntitySale> ventas = repositorySale.findByStatusOrderBySaleDateDesc(STATUS_COMPLETADA)
+                .stream()
+                .limit(limit)
+                .toList();
 
         List<Map<String, Object>> items = ventas.stream()
-            .map(s -> {
-                Map<String, Object> data = new HashMap<>();
-                data.put("saleNumber", s.getSaleNumber());
-                data.put("customerName", s.getCustomer() != null ? s.getCustomer().getName() : "—");
-                data.put("total", s.getTotal());
-                data.put("paymentMethod", s.getPaymentMethod());
-                data.put("saleDate", s.getSaleDate().toString());
-                return data;
-            })
-            .collect(Collectors.toList());
+                .map(this::mapRecentSale)
+                .toList();
 
         response.setListSales(items);
         response.success();
         return response;
+    }
+
+    private Map<String, Object> mapRecentSale(EntitySale s) {
+        Map<String, Object> data = new HashMap<>();
+        data.put(BusinessUtils.KEY_SALE_NUMBER, s.getSaleNumber());
+        data.put(BusinessUtils.KEY_CUSTOMER_NAME, getCustomerName(s));
+        data.put(BusinessUtils.KEY_TOTAL, s.getTotal());
+        data.put(BusinessUtils.KEY_PAYMENT_METHOD, s.getPaymentMethod());
+        data.put(BusinessUtils.KEY_SALE_DATE, s.getSaleDate().toString());
+        return data;
     }
 
     private Date getStartOfDay(int daysAgo) {
@@ -336,197 +413,201 @@ public class BusinessSale {
     }
 
     private String capitalize(String str) {
-        if (str == null || str.isEmpty()) return str;
+        if (str == null || str.isEmpty())
+            return str;
         return str.substring(0, 1).toUpperCase() + str.substring(1);
     }
-    
+
     public ResponseSaleReport getReport(String from, String to) {
         ResponseSaleReport response = new ResponseSaleReport();
         try {
-            Date fechaFrom = parseDate(from, false);
-            Date fechaTo = parseDate(to, true);
+            Date fechaFrom = BusinessUtils.parseDate(from, false);
+            Date fechaTo = BusinessUtils.parseDate(to, true);
 
-            List<EntitySale> ventas = repositorySale.findAll().stream()
-                .filter(s -> "Completada".equals(s.getStatus()))
-                .filter(s -> s.getSaleDate() != null
-                    && !s.getSaleDate().before(fechaFrom)
-                    && !s.getSaleDate().after(fechaTo))
-                .sorted((a, b) -> a.getSaleDate().compareTo(b.getSaleDate()))
-                .collect(Collectors.toList());
+            List<EntitySale> ventas = filterSalesByDateRange(fechaFrom, fechaTo);
 
-            double totalMonto = ventas.stream()
-                .mapToDouble(s -> s.getTotal().doubleValue()).sum();
+            double totalMonto = sumTotals(ventas);
+            double totalDescuento = sumDiscounts(ventas);
+            double totalIgv = sumIgv(ventas);
 
-            double totalDescuento = ventas.stream()
-                .mapToDouble(s -> s.getDiscount() != null ? s.getDiscount().doubleValue() : 0).sum();
+            List<Map<String, Object>> detalle = ventas.stream().map(this::mapReportSale).toList();
 
-            double totalIgv = ventas.stream()
-                .mapToDouble(s -> s.getIgv().doubleValue()).sum();
-
-            List<Map<String, Object>> detalle = ventas.stream().map(s -> {
-                Map<String, Object> data = new HashMap<>();
-                data.put("idSale", s.getIdSale());
-                data.put("saleNumber", s.getSaleNumber());
-                data.put("saleDate", s.getSaleDate().toString());
-                data.put("customerName", s.getCustomer() != null ? s.getCustomer().getName() : "Sin cliente");
-                data.put("userName", s.getUser() != null
-                    ? s.getUser().getFirstName() + " " + s.getUser().getSurName() : "—");
-                data.put("paymentMethod", s.getPaymentMethod());
-                data.put("subtotal", s.getSubtotal().toString());
-                data.put("discount", s.getDiscount() != null ? s.getDiscount().toString() : "0");
-                data.put("igv", s.getIgv().toString());
-                data.put("total", s.getTotal().toString());
-                return data;
-            }).collect(Collectors.toList());
-
-            Map<String, Object> resumen = new HashMap<>();
-            resumen.put("totalVentas", ventas.size());
-            resumen.put("totalMonto", totalMonto);
-            resumen.put("totalDescuento", totalDescuento);
-            resumen.put("totalIgv", totalIgv);
-            resumen.put("ticketPromedio", ventas.isEmpty() ? 0 : totalMonto / ventas.size());
+            Map<String, Object> resumen = buildReportSummary(ventas.size(), totalMonto, totalDescuento, totalIgv);
 
             response.setResumen(resumen);
             response.setDetalle(detalle);
             response.success();
 
-        } catch (Exception e) {
-            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        } catch (RuntimeException e) {
+            response.listMessage.add(BusinessUtils.MSG_ERROR_GENERAR_REPORTE + e.getMessage());
         }
         return response;
+    }
+
+    private List<EntitySale> filterSalesByDateRange(Date from, Date to) {
+        return repositorySale.findAll().stream()
+                .filter(s -> STATUS_COMPLETADA.equals(s.getStatus()))
+                .filter(s -> s.getSaleDate() != null
+                        && !s.getSaleDate().before(from)
+                        && !s.getSaleDate().after(to))
+                .sorted(Comparator.comparing(EntitySale::getSaleDate))
+                .toList();
+    }
+
+    private double sumDiscounts(List<EntitySale> sales) {
+        return sales.stream()
+                .mapToDouble(s -> s.getDiscount() != null ? s.getDiscount().doubleValue() : 0).sum();
+    }
+
+    private double sumIgv(List<EntitySale> sales) {
+        return sales.stream().mapToDouble(s -> s.getIgv().doubleValue()).sum();
+    }
+
+    private Map<String, Object> mapReportSale(EntitySale s) {
+        Map<String, Object> data = new HashMap<>();
+        data.put(BusinessUtils.KEY_ID_SALE, s.getIdSale());
+        data.put(BusinessUtils.KEY_SALE_NUMBER, s.getSaleNumber());
+        data.put(BusinessUtils.KEY_SALE_DATE, s.getSaleDate().toString());
+        data.put(BusinessUtils.KEY_CUSTOMER_NAME, s.getCustomer() != null ? s.getCustomer().getName() : BusinessUtils.SIN_CLIENTE);
+        data.put(BusinessUtils.KEY_USER_NAME, BusinessUtils.buildFullName(s.getUser()));
+        data.put(BusinessUtils.KEY_PAYMENT_METHOD, s.getPaymentMethod());
+        data.put(BusinessUtils.KEY_SUBTOTAL, BusinessUtils.formatBigDecimal(s.getSubtotal()));
+        data.put(BusinessUtils.KEY_DISCOUNT, BusinessUtils.formatBigDecimal(s.getDiscount()));
+        data.put(BusinessUtils.KEY_IGV, s.getIgv().toString());
+        data.put(BusinessUtils.KEY_TOTAL, s.getTotal().toString());
+        return data;
+    }
+
+    private Map<String, Object> buildReportSummary(int totalVentas, double totalMonto,
+            double totalDescuento, double totalIgv) {
+        Map<String, Object> resumen = new HashMap<>();
+        resumen.put(BusinessUtils.KEY_TOTAL_VENTAS, totalVentas);
+        resumen.put(BusinessUtils.KEY_TOTAL_MONTO, totalMonto);
+        resumen.put(BusinessUtils.KEY_TOTAL_DESCUENTO, totalDescuento);
+        resumen.put(BusinessUtils.KEY_TOTAL_IGV, totalIgv);
+        resumen.put(BusinessUtils.KEY_TICKET_PROMEDIO, totalVentas == 0 ? 0 : totalMonto / totalVentas);
+        return resumen;
     }
 
     public ResponseSaleReport getReportByUser(String from, String to) {
         ResponseSaleReport response = new ResponseSaleReport();
         try {
-            Date fechaFrom = parseDate(from, false);
-            Date fechaTo = parseDate(to, true);
+            Date fechaFrom = BusinessUtils.parseDate(from, false);
+            Date fechaTo = BusinessUtils.parseDate(to, true);
 
-            List<EntitySale> ventas = repositorySale.findAll().stream()
-                .filter(s -> "Completada".equals(s.getStatus()))
-                .filter(s -> s.getSaleDate() != null
-                    && !s.getSaleDate().before(fechaFrom)
-                    && !s.getSaleDate().after(fechaTo))
-                .collect(Collectors.toList());
+            List<EntitySale> ventas = filterSalesByDateRange(fechaFrom, fechaTo);
 
             Map<String, Map<String, Object>> porUsuario = new LinkedHashMap<>();
 
             for (EntitySale s : ventas) {
-                String idUser = s.getUser() != null ? s.getUser().getIdUser() : "sin-usuario";
-                String userName = s.getUser() != null
-                    ? s.getUser().getFirstName() + " " + s.getUser().getSurName() : "Sin usuario";
-                String role = s.getUser() != null ? s.getUser().getRole() : "—";
+                String idUser = s.getUser() != null ? s.getUser().getIdUser() : BusinessUtils.SIN_ID + "usuario";
+                String userName = BusinessUtils.buildFullName(s.getUser());
+                String role = s.getUser() != null ? s.getUser().getRole() : BusinessUtils.DEFAULT_VALUE;
 
-                porUsuario.computeIfAbsent(idUser, k -> {
-                    Map<String, Object> m = new HashMap<>();
-                    m.put("idUser", idUser);
-                    m.put("userName", userName);
-                    m.put("role", role);
-                    m.put("totalVentas", 0);
-                    m.put("totalMonto", 0.0);
-                    return m;
-                });
+                porUsuario.computeIfAbsent(idUser, k -> buildUserReportMap(idUser, userName, role));
 
                 Map<String, Object> u = porUsuario.get(idUser);
-                u.put("totalVentas", (int) u.get("totalVentas") + 1);
-                u.put("totalMonto", (double) u.get("totalMonto") + s.getTotal().doubleValue());
+                u.put(BusinessUtils.KEY_TOTAL_VENTAS, (int) u.get(BusinessUtils.KEY_TOTAL_VENTAS) + 1);
+                u.put(BusinessUtils.KEY_TOTAL_MONTO, (double) u.get(BusinessUtils.KEY_TOTAL_MONTO) + s.getTotal().doubleValue());
             }
 
-            List<Map<String, Object>> detalle = new ArrayList<>(porUsuario.values());
-            detalle.sort((a, b) -> Double.compare((double) b.get("totalMonto"), (double) a.get("totalMonto")));
-
-            double totalMonto = detalle.stream().mapToDouble(d -> (double) d.get("totalMonto")).sum();
+            List<Map<String, Object>> detalle = sortByTotalMontoDesc(new ArrayList<>(porUsuario.values()));
+            double totalMonto = sumTotalMontoFromList(detalle);
 
             Map<String, Object> resumen = new HashMap<>();
-            resumen.put("totalVentas", ventas.size());
-            resumen.put("totalMonto", totalMonto);
-            resumen.put("totalUsuarios", detalle.size());
+            resumen.put(BusinessUtils.KEY_TOTAL_VENTAS, ventas.size());
+            resumen.put(BusinessUtils.KEY_TOTAL_MONTO, totalMonto);
+            resumen.put(BusinessUtils.KEY_TOTAL_USUARIOS, detalle.size());
 
             response.setResumen(resumen);
             response.setDetalle(detalle);
             response.success();
 
-        } catch (Exception e) {
-            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        } catch (RuntimeException e) {
+            response.listMessage.add(BusinessUtils.MSG_ERROR_GENERAR_REPORTE + e.getMessage());
         }
         return response;
+    }
+
+    private Map<String, Object> buildUserReportMap(String idUser, String userName, String role) {
+        Map<String, Object> m = new HashMap<>();
+        m.put(BusinessUtils.KEY_ID_USER, idUser);
+        m.put(BusinessUtils.KEY_USER_NAME, userName);
+        m.put(BusinessUtils.KEY_ROLE, role);
+        m.put(BusinessUtils.KEY_TOTAL_VENTAS, 0);
+        m.put(BusinessUtils.KEY_TOTAL_MONTO, 0.0);
+        return m;
+    }
+
+    private List<Map<String, Object>> sortByTotalMontoDesc(List<Map<String, Object>> list) {
+        list.sort((a, b) -> Double.compare((double) b.get(BusinessUtils.KEY_TOTAL_MONTO), (double) a.get(BusinessUtils.KEY_TOTAL_MONTO)));
+        return list;
+    }
+
+    private double sumTotalMontoFromList(List<Map<String, Object>> list) {
+        return list.stream().mapToDouble(d -> (double) d.get(BusinessUtils.KEY_TOTAL_MONTO)).sum();
     }
 
     public ResponseSaleReport getReportByProduct(String from, String to) {
         ResponseSaleReport response = new ResponseSaleReport();
         try {
-            Date fechaFrom = parseDate(from, false);
-            Date fechaTo = parseDate(to, true);
+            Date fechaFrom = BusinessUtils.parseDate(from, false);
+            Date fechaTo = BusinessUtils.parseDate(to, true);
 
-            List<EntitySale> ventas = repositorySale.findAll().stream()
-                .filter(s -> "Completada".equals(s.getStatus()))
-                .filter(s -> s.getSaleDate() != null
-                    && !s.getSaleDate().before(fechaFrom)
-                    && !s.getSaleDate().after(fechaTo))
-                .collect(Collectors.toList());
+            List<EntitySale> ventas = filterSalesByDateRange(fechaFrom, fechaTo);
 
             Map<String, Map<String, Object>> porProducto = new LinkedHashMap<>();
 
             for (EntitySale s : ventas) {
                 List<EntitySaleDetail> detalles = repositorySaleDetail.findBySale_IdSale(s.getIdSale());
                 for (EntitySaleDetail d : detalles) {
-                    String idProduct = d.getProduct() != null ? d.getProduct().getIdProduct() : "sin-producto";
-                    String productName = d.getProduct() != null ? d.getProduct().getName() : "Sin producto";
+                    String idProduct = d.getProduct() != null ? d.getProduct().getIdProduct() : BusinessUtils.SIN_ID + "producto";
+                    String productName = d.getProduct() != null ? d.getProduct().getName() : BusinessUtils.SIN_PRODUCTO;
 
-                    porProducto.computeIfAbsent(idProduct, k -> {
-                        Map<String, Object> m = new HashMap<>();
-                        m.put("idProduct", idProduct);
-                        m.put("productName", productName);
-                        m.put("totalQty", 0);
-                        m.put("totalMonto", 0.0);
-                        m.put("vecesVendido", 0);
-                        return m;
-                    });
+                    porProducto.computeIfAbsent(idProduct, k -> buildProductReportMap(idProduct, productName));
 
                     Map<String, Object> p = porProducto.get(idProduct);
-                    p.put("totalQty", (int) p.get("totalQty") + d.getQuantity());
-                    p.put("totalMonto", (double) p.get("totalMonto") + d.getSubtotal().doubleValue());
-                    p.put("vecesVendido", (int) p.get("vecesVendido") + 1);
+                    p.put(BusinessUtils.KEY_TOTAL_QTY, (int) p.get(BusinessUtils.KEY_TOTAL_QTY) + d.getQuantity());
+                    p.put(BusinessUtils.KEY_TOTAL_MONTO, (double) p.get(BusinessUtils.KEY_TOTAL_MONTO) + d.getSubtotal().doubleValue());
+                    p.put(BusinessUtils.KEY_VECES_VENDIDO, (int) p.get(BusinessUtils.KEY_VECES_VENDIDO) + 1);
                 }
             }
 
-            List<Map<String, Object>> detalle = new ArrayList<>(porProducto.values());
-            detalle.sort((a, b) -> Integer.compare((int) b.get("totalQty"), (int) a.get("totalQty")));
-
-            int totalUnidades = detalle.stream().mapToInt(d -> (int) d.get("totalQty")).sum();
-            double totalMonto = detalle.stream().mapToDouble(d -> (double) d.get("totalMonto")).sum();
+            List<Map<String, Object>> detalle = sortByTotalQtyDesc(new ArrayList<>(porProducto.values()));
+            int totalUnidades = sumTotalQty(detalle);
+            double totalMonto = sumTotalMontoFromList(detalle);
 
             Map<String, Object> resumen = new HashMap<>();
-            resumen.put("totalProductos", detalle.size());
-            resumen.put("totalUnidades", totalUnidades);
-            resumen.put("totalMonto", totalMonto);
+            resumen.put(BusinessUtils.KEY_TOTAL_PRODUCTOS, detalle.size());
+            resumen.put(BusinessUtils.KEY_TOTAL_UNIDADES, totalUnidades);
+            resumen.put(BusinessUtils.KEY_TOTAL_MONTO, totalMonto);
 
             response.setResumen(resumen);
             response.setDetalle(detalle);
             response.success();
 
-        } catch (Exception e) {
-            response.listMessage.add("Error al generar reporte: " + e.getMessage());
+        } catch (RuntimeException e) {
+            response.listMessage.add(BusinessUtils.MSG_ERROR_GENERAR_REPORTE + e.getMessage());
         }
         return response;
     }
 
-    private Date parseDate(String dateStr, boolean endOfDay) {
-        try {
-            java.text.SimpleDateFormat sdf = new java.text.SimpleDateFormat("yyyy-MM-dd");
-            Date date = sdf.parse(dateStr);
-            if (endOfDay) {
-                Calendar cal = Calendar.getInstance();
-                cal.setTime(date);
-                cal.set(Calendar.HOUR_OF_DAY, 23);
-                cal.set(Calendar.MINUTE, 59);
-                cal.set(Calendar.SECOND, 59);
-                return cal.getTime();
-            }
-            return date;
-        } catch (Exception e) {
-            return endOfDay ? new Date() : new Date(0);
-        }
+    private Map<String, Object> buildProductReportMap(String idProduct, String productName) {
+        Map<String, Object> m = new HashMap<>();
+        m.put(BusinessUtils.KEY_ID_PRODUCT, idProduct);
+        m.put(BusinessUtils.KEY_PRODUCT_NAME, productName);
+        m.put(BusinessUtils.KEY_TOTAL_QTY, 0);
+        m.put(BusinessUtils.KEY_TOTAL_MONTO, 0.0);
+        m.put(BusinessUtils.KEY_VECES_VENDIDO, 0);
+        return m;
     }
-    
+
+    private List<Map<String, Object>> sortByTotalQtyDesc(List<Map<String, Object>> list) {
+        list.sort((a, b) -> Integer.compare((int) b.get(BusinessUtils.KEY_TOTAL_QTY), (int) a.get(BusinessUtils.KEY_TOTAL_QTY)));
+        return list;
+    }
+
+    private int sumTotalQty(List<Map<String, Object>> list) {
+        return list.stream().mapToInt(d -> (int) d.get(BusinessUtils.KEY_TOTAL_QTY)).sum();
+    }
 }

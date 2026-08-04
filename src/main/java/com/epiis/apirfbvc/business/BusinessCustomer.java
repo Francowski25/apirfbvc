@@ -7,7 +7,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -22,133 +21,135 @@ import com.epiis.apirfbvc.repository.RepositorySale;
 
 @Service
 public class BusinessCustomer {
+	private static final String TOTAL_COMPRAS = "totalCompras";
+	private static final String TOTAL_MONTO = "totalMonto";
+
 	private final RepositoryCustomer repositoryCustomer;
 	private final RepositorySale repositorySale;
 
 	public BusinessCustomer(RepositoryCustomer repositoryCustomer,
-            RepositorySale repositorySale) {
+			RepositorySale repositorySale) {
 		this.repositoryCustomer = repositoryCustomer;
 		this.repositorySale = repositorySale;
 	}
-	
+
 	public ResponseCustomerGetAll getAll() {
 		ResponseCustomerGetAll response = new ResponseCustomerGetAll();
-		
+
 		List<EntityCustomer> listEntityCustomers = repositoryCustomer.findAll();
-		
-		for(EntityCustomer item: listEntityCustomers) {
+
+		for (EntityCustomer item : listEntityCustomers) {
 			Map<String, String> data = new HashMap<>();
-			
+
 			data.put("idCustomer", item.getIdCustomer());
-            data.put("documentType", item.getDocumentType());
-            data.put("documentNumber", item.getDocumentNumber());
-            data.put("name", item.getName());
-            data.put("createdAt", item.getCreatedAt().toString());
-            
+			data.put("documentType", item.getDocumentType());
+			data.put("documentNumber", item.getDocumentNumber());
+			data.put("name", item.getName());
+			data.put("createdAt", item.getCreatedAt().toString());
+
 			response.getListCustomers().add(data);
 		}
-		
+
 		response.success();
-		
+
 		return response;
 	}
-	
 
 	public ResponseCustomerInsert insert(RequestCustomerInsert request) {
-	    ResponseCustomerInsert response = new ResponseCustomerInsert();
+		ResponseCustomerInsert response = new ResponseCustomerInsert();
 
-	    if (request.getDocumentNumber() == null || request.getDocumentNumber().isBlank()) {
-	        response.listMessage.add("El número de documento es obligatorio.");
-	        return response;
-	    }
+		if (request.getDocumentNumber() == null || request.getDocumentNumber().isBlank()) {
+			response.listMessage.add("El número de documento es obligatorio.");
+			return response;
+		}
 
-	    if (request.getName() == null || request.getName().isBlank()) {
-	        response.listMessage.add("El nombre es obligatorio.");
-	        return response;
-	    }
+		if (request.getName() == null || request.getName().isBlank()) {
+			response.listMessage.add("El nombre es obligatorio.");
+			return response;
+		}
 
-	    if (repositoryCustomer.existsByDocumentNumber(request.getDocumentNumber())) {
-	        response.listMessage.add("Ya existe un cliente con ese número de documento.");
-	        return response;
-	    }
+		if (repositoryCustomer.existsByDocumentNumber(request.getDocumentNumber())) {
+			response.listMessage.add("Ya existe un cliente con ese número de documento.");
+			return response;
+		}
 
-	    EntityCustomer customer = new EntityCustomer();
-	    customer.setIdCustomer(UUID.randomUUID().toString());
-	    customer.setDocumentType(request.getDocumentType() != null ? request.getDocumentType() : "DNI");
-	    customer.setDocumentNumber(request.getDocumentNumber());
-	    customer.setName(request.getName());
+		EntityCustomer customer = new EntityCustomer();
+		customer.setIdCustomer(UUID.randomUUID().toString());
+		customer.setDocumentType(request.getDocumentType() != null ? request.getDocumentType() : "DNI");
+		customer.setDocumentNumber(request.getDocumentNumber());
+		customer.setName(request.getName());
 		customer.setCreatedAt(new java.sql.Date(new Date().getTime()));
 
-	    repositoryCustomer.save(customer);
+		repositoryCustomer.save(customer);
 
-	    response.success();
-	    response.listMessage.add("Cliente registrado correctamente.");
-	    return response;
+		response.success();
+		response.listMessage.add("Cliente registrado correctamente.");
+		return response;
 	}
-	
+
 	public ResponseCustomerReport getReportFrequent() {
-	    ResponseCustomerReport response = new ResponseCustomerReport();
+		ResponseCustomerReport response = new ResponseCustomerReport();
 
-	    try {
+		try {
 
-	        List<EntitySale> ventas = repositorySale.findAll().stream()
-	                .filter(s -> "Completada".equals(s.getStatus()))
-	                .filter(s -> s.getCustomer() != null)
-	                .collect(Collectors.toList());
+			List<EntitySale> ventas = repositorySale.findAll().stream()
+					.filter(s -> "Completada".equals(s.getStatus()))
+					.filter(s -> s.getCustomer() != null)
+					.toList();
 
-	        Map<String, Map<String, Object>> porCliente = new LinkedHashMap<>();
+			Map<String, Map<String, Object>> porCliente = new LinkedHashMap<>();
 
-	        for (EntitySale s : ventas) {
+			for (EntitySale s : ventas) {
 
-	            String idCustomer = s.getCustomer().getIdCustomer();
-	            String customerName = s.getCustomer().getName();
-	            String documentType = s.getCustomer().getDocumentType();
-	            String documentNumber = s.getCustomer().getDocumentNumber();
+				String idCustomer = s.getCustomer().getIdCustomer();
+				String customerName = s.getCustomer().getName();
+				String documentType = s.getCustomer().getDocumentType();
+				String documentNumber = s.getCustomer().getDocumentNumber();
 
-	            porCliente.computeIfAbsent(idCustomer, k -> {
-	                Map<String, Object> map = new HashMap<>();
-	                map.put("idCustomer", idCustomer);
-	                map.put("customerName", customerName);
-	                map.put("documentType", documentType);
-	                map.put("documentNumber", documentNumber);
-	                map.put("totalCompras", 0);
-	                map.put("totalMonto", 0.0);
-	                return map;
-	            });
+				porCliente.computeIfAbsent(idCustomer, k -> {
+					Map<String, Object> map = new HashMap<>();
+					map.put("idCustomer", idCustomer);
+					map.put("customerName", customerName);
+					map.put("documentType", documentType);
+					map.put("documentNumber", documentNumber);
+					map.put(TOTAL_COMPRAS, 0);
+					map.put(TOTAL_MONTO, 0.0);
+					return map;
+				});
 
-	            Map<String, Object> cliente = porCliente.get(idCustomer);
+				Map<String, Object> cliente = porCliente.get(idCustomer);
 
-	            cliente.put("totalCompras",
-	                    (int) cliente.get("totalCompras") + 1);
+				cliente.put(TOTAL_COMPRAS,
+						(int) cliente.get(TOTAL_COMPRAS) + 1);
 
-	            cliente.put("totalMonto",
-	                    (double) cliente.get("totalMonto")
-	                            + s.getTotal().doubleValue());
-	        }
+				cliente.put(TOTAL_MONTO,
+						(double) cliente.get(TOTAL_MONTO)
+								+ s.getTotal().doubleValue());
+			}
 
-	        List<Map<String, Object>> detalle = new ArrayList<>(porCliente.values());
+			List<Map<String, Object>> detalle = new ArrayList<>(porCliente.values());
 
-	        detalle.sort((a, b) -> Integer.compare(
-	                (int) b.get("totalCompras"),
-	                (int) a.get("totalCompras")));
+			detalle.sort((a, b) -> Integer.compare(
+					(int) b.get(TOTAL_COMPRAS),
+					(int) a.get(TOTAL_COMPRAS)));
 
-	        double totalMonto = detalle.stream()
-	                .mapToDouble(d -> (double) d.get("totalMonto"))
-	                .sum();
+			double totalMonto = detalle.stream()
+					.mapToDouble(d -> (double) d.get(TOTAL_MONTO))
+					.sum();
 
-	        Map<String, Object> resumen = new HashMap<>();
-	        resumen.put("totalClientes", detalle.size());
-	        resumen.put("totalCompras", ventas.size());
-	        resumen.put("totalMonto", totalMonto);
+			Map<String, Object> resumen = new HashMap<>();
+			resumen.put("totalClientes", detalle.size());
+			resumen.put(TOTAL_COMPRAS, ventas.size());
+			resumen.put(TOTAL_MONTO, totalMonto);
 
-	        response.setResumen(resumen);
-	        response.setDetalle(detalle);
-	        response.success();
+			response.setResumen(resumen);
+			response.setDetalle(detalle);
+			response.success();
 
-	    } catch (Exception e) {
-	        response.listMessage.add("Error al generar reporte: " + e.getMessage());
-	    }
+		} catch (Exception e) {
+			response.listMessage.add("Error al generar reporte: " + e.getMessage());
+		}
 
-	    return response;
+		return response;
 	}
 }

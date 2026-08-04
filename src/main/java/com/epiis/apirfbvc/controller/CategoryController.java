@@ -1,5 +1,6 @@
 package com.epiis.apirfbvc.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -13,7 +14,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.epiis.apirfbvc.business.BusinessCategory;
 import com.epiis.apirfbvc.dto.request.RequestCategoryDetail;
-import com.epiis.apirfbvc.dto.request.RequestCategoryDisable;
 import com.epiis.apirfbvc.dto.request.RequestCategoryInsert;
 import com.epiis.apirfbvc.dto.response.ResponseCategoryDetail;
 import com.epiis.apirfbvc.dto.response.ResponseCategoryDisable;
@@ -25,77 +25,82 @@ import jakarta.validation.Valid;
 @RestController
 @RequestMapping(path = "categories")
 public class CategoryController {
-	private final BusinessCategory businessCategory;
 
-	public CategoryController(BusinessCategory businessCategory) {
-		this.businessCategory = businessCategory;
-	}
-	
-	@PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ResponseCategoryInsert> actionInsert(@Valid @ModelAttribute RequestCategoryInsert request, BindingResult bindingResult) {
-		try {
-			ResponseCategoryInsert response;
-			
-			if (bindingResult.hasErrors()) {
-				response = new ResponseCategoryInsert();
-				
-				bindingResult.getAllErrors()
-                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-				
-				return ResponseEntity.ok(response);
-			}
-			
-			response = businessCategory.insert(request);
-			
-			return ResponseEntity.ok(response);
-		} catch(Exception e) {
-			ResponseCategoryInsert response = new ResponseCategoryInsert();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
-		}
-	}
-	
-	@GetMapping(path = "getall")
-	public ResponseEntity<ResponseCategoryGetAll> listCategories(){
-		return ResponseEntity.ok(businessCategory.getAll());
-	}
+    private final BusinessCategory businessCategory;
 
-	@PutMapping(path = "status/{id}/{newStatus}")
-	public ResponseEntity<ResponseCategoryDisable> actionUpdateStatus(
-	        @PathVariable String id, @PathVariable String newStatus) {
-	    try {
-	        ResponseCategoryDisable response = businessCategory.updateCategoryStatus(id, newStatus);
-	        return ResponseEntity.ok(response);
-	    } catch (Exception e) {
-	        ResponseCategoryDisable response = new ResponseCategoryDisable();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
-	    }
-	}
+    public CategoryController(BusinessCategory businessCategory) {
+        this.businessCategory = businessCategory;
+    }
 
-	@GetMapping(path = "detail")
-	public ResponseEntity<ResponseCategoryDetail> actionDetail(
-	        @Valid @ModelAttribute RequestCategoryDetail request, BindingResult bindingResult) {
-	    try {
-	        ResponseCategoryDetail response;
+    @PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<ResponseCategoryInsert> actionInsert(@Valid @ModelAttribute RequestCategoryInsert request,
+            BindingResult bindingResult) {
+        try {
+            ResponseCategoryInsert response;
 
-	        if (bindingResult.hasErrors()) {
-	            response = new ResponseCategoryDetail();
-	            bindingResult.getAllErrors()
-	                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-	            return ResponseEntity.ok(response);
-	        }
+            if (bindingResult.hasErrors()) {
+                response = new ResponseCategoryInsert();
+                bindingResult.getAllErrors()
+                        .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
 
-	        response = businessCategory.getDetail(request);
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
 
-	        return ResponseEntity.ok(response);
-	    } catch (Exception e) {
-	        ResponseCategoryDetail response = new ResponseCategoryDetail();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
-	    }
-	}
+            response = businessCategory.insert(request);
+
+            return ResponseEntity.status(HttpStatus.CREATED).body(response);
+        } catch (Exception e) {
+            ResponseCategoryInsert response = new ResponseCategoryInsert();
+            response.exception();
+            response.listMessage.add(e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping(path = "getall")
+    public ResponseEntity<ResponseCategoryGetAll> listCategories() {
+        return ResponseEntity.ok(businessCategory.getAll());
+    }
+
+    @PutMapping(path = "status/{id}/{newStatus}")
+    public ResponseEntity<ResponseCategoryDisable> actionUpdateStatus(
+            @PathVariable String id, @PathVariable String newStatus) {
+        try {
+            ResponseCategoryDisable response = businessCategory.updateCategoryStatus(id, newStatus);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            ResponseCategoryDisable response = new ResponseCategoryDisable();
+            response.exception();
+            response.listMessage.add(e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    @GetMapping(path = "detail")
+    public ResponseEntity<ResponseCategoryDetail> actionDetail(
+            @Valid @ModelAttribute RequestCategoryDetail request, BindingResult bindingResult) {
+        try {
+            ResponseCategoryDetail response;
+
+            if (bindingResult.hasErrors()) {
+                response = new ResponseCategoryDetail();
+                bindingResult.getAllErrors()
+                        .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+            }
+
+            response = businessCategory.getDetail(request);
+
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            ResponseCategoryDetail response = new ResponseCategoryDetail();
+            response.exception();
+            response.listMessage.add(e.getMessage());
+
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
 }

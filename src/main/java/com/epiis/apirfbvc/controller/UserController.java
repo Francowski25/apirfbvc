@@ -1,5 +1,6 @@
 package com.epiis.apirfbvc.controller;
 
+import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.validation.BindingResult;
@@ -24,101 +25,108 @@ import jakarta.validation.Valid;
 @RequestMapping(path = "users")
 public class UserController {
 	private final BusinessUser businessUser;
-	
+
 	public UserController(
-			BusinessUser businessUser
-	) {
+			BusinessUser businessUser) {
 		this.businessUser = businessUser;
 	}
-	
+
 	@PostMapping(path = "insert", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-	public ResponseEntity<ResponseUserInsert> actionInsert(@Valid @ModelAttribute RequestUserInsert request, BindingResult bindingResult) {
+	public ResponseEntity<ResponseUserInsert> actionInsert(@Valid @ModelAttribute RequestUserInsert request,
+			BindingResult bindingResult) {
 		try {
 			ResponseUserInsert response;
-			
+
 			if (bindingResult.hasErrors()) {
 				response = new ResponseUserInsert();
-				
+
 				bindingResult.getAllErrors()
-                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-				
-				return ResponseEntity.ok(response);
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
 			}
-			
+
 			response = businessUser.insert(request);
-			
-			return ResponseEntity.ok(response);
-		} catch(Exception e) {
+
+			return ResponseEntity.status(HttpStatus.CREATED).body(response);
+		} catch (Exception e) {
 			ResponseUserInsert response = new ResponseUserInsert();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
 		}
 	}
-	
+
 	@GetMapping(path = "getall")
 	public ResponseEntity<ResponseUserGetAll> listUsers() {
 		return ResponseEntity.ok(businessUser.getAll());
 	}
-	
+
 	@PutMapping(path = "status/{id}/{newStatus}")
 	public ResponseEntity<ResponseUserInsert> updateStatus(@PathVariable String id, @PathVariable String newStatus) {
-	    return ResponseEntity.ok(businessUser.updateUserStatus(id, newStatus));
+		try {
+			return ResponseEntity.ok(businessUser.updateUserStatus(id, newStatus));
+		} catch (Exception e) {
+			ResponseUserInsert response = new ResponseUserInsert();
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+		}
 	}
-	
+
 	@GetMapping(path = "dashboard/kpi/{idUser}")
 	public ResponseEntity<ResponseUserDashboardKpi> getDashboardKpi(
-	        @PathVariable String idUser) {
+			@PathVariable String idUser) {
 
-	    return ResponseEntity.ok(
-	            businessUser.getDashboardKpi(idUser));
+		return ResponseEntity.ok(
+				businessUser.getDashboardKpi(idUser));
 	}
-	
+
 	@PutMapping(path = "updateProfile", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<ResponseUserGetAll> actionUpdateProfile(
-	        @Valid @ModelAttribute RequestUserUpdateProfile request, BindingResult bindingResult) {
-	    try {
-	    	ResponseUserGetAll response;
+			@Valid @ModelAttribute RequestUserUpdateProfile request, BindingResult bindingResult) {
+		try {
+			ResponseUserGetAll response;
 
-	        if (bindingResult.hasErrors()) {
-	            response = new ResponseUserGetAll();
-	            bindingResult.getAllErrors()
-	                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-	            return ResponseEntity.ok(response);
-	        }
+			if (bindingResult.hasErrors()) {
+				response = new ResponseUserGetAll();
+				bindingResult.getAllErrors()
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+			}
 
-	        response = businessUser.updateProfile(request);
+			response = businessUser.updateProfile(request);
 
-	        return ResponseEntity.ok(response);
-	    } catch (Exception e) {
-	    	ResponseUserGetAll response = new ResponseUserGetAll();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
-	    }
+			return ResponseEntity.ok(response);
+		} catch (Exception e) {
+			ResponseUserGetAll response = new ResponseUserGetAll();
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+		}
 	}
 
 	@PutMapping(path = "updatePassword", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
 	public ResponseEntity<ResponseUserGetAll> actionUpdatePassword(
-	        @Valid @ModelAttribute RequestUserUpdatePassword request, BindingResult bindingResult) {
-	    try {
-	    	ResponseUserGetAll response;
+			@Valid @ModelAttribute RequestUserUpdatePassword request, BindingResult bindingResult) {
+		try {
+			ResponseUserGetAll response;
 
-	        if (bindingResult.hasErrors()) {
-	            response = new ResponseUserGetAll();
-	            bindingResult.getAllErrors()
-	                .forEach(error -> response.listMessage.add(error.getDefaultMessage()));
-	            return ResponseEntity.ok(response);
-	        }
+			if (bindingResult.hasErrors()) {
+				response = new ResponseUserGetAll();
+				bindingResult.getAllErrors()
+						.forEach(error -> response.listMessage.add(error.getDefaultMessage()));
+				return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(response);
+			}
 
-	        response = businessUser.updatePassword(request);
+			response = businessUser.updatePassword(request);
 
-	        return ResponseEntity.ok(response);
-	    } catch (Exception e) {
-	    	ResponseUserGetAll response = new ResponseUserGetAll();
-	        response.exception();
-	        response.listMessage.add(e.getMessage());
-	        return ResponseEntity.ok(response);
-	    }
+			return ResponseEntity.ok(response);
+		} catch (Exception e) {
+			ResponseUserGetAll response = new ResponseUserGetAll();
+			response.exception();
+			response.listMessage.add(e.getMessage());
+			return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+		}
 	}
 }

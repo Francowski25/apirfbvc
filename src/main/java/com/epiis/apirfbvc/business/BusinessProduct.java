@@ -7,7 +7,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
@@ -46,9 +45,9 @@ public class BusinessProduct {
         product.setRequiresPrescription(request.isRequiresPrescription());
         product.setStockMinimum(request.getStockMinimum());
         product.setStatus("activo");
-		product.setCreatedAt(new java.sql.Date(new Date().getTime()));
-		product.setUpdatedAt(product.getCreatedAt());
-        
+        product.setCreatedAt(new java.sql.Date(new Date().getTime()));
+        product.setUpdatedAt(product.getCreatedAt());
+
         EntityCategory category = new EntityCategory();
         category.setIdCategory(request.getIdCategory());
         product.setCategory(category);
@@ -67,11 +66,10 @@ public class BusinessProduct {
         lot.setProduct(product);
         lot.setSupplier(null);
         lot.setCreatedAt(new java.sql.Date(new Date().getTime()));
-		lot.setUpdatedAt(lot.getCreatedAt());
+        lot.setUpdatedAt(lot.getCreatedAt());
 
         if (request.getNextExpiration() != null && !request.getNextExpiration().isBlank()) {
             lot.setExpirationDate(LocalDate.parse(request.getNextExpiration()));
-
         } else {
             lot.setExpirationDate(LocalDate.of(2099, 12, 31));
         }
@@ -79,17 +77,19 @@ public class BusinessProduct {
         repositoryLot.save(lot);
 
         response.success();
-		response.listMessage.add("Registro realizado correctamente.");
+        response.listMessage.add("Registro realizado correctamente.");
 
         return response;
     }
-    
+
     public ResponseProductGetAll getAll() {
         ResponseProductGetAll response = new ResponseProductGetAll();
         List<EntityProduct> list = repositoryProduct.findAll();
+
         List<Map<String, String>> items = list.stream()
-            .map(this::toMap)
-            .collect(Collectors.toList());
+                .map(this::toMap)
+                .toList();
+
         response.setListProducts(items);
         response.success();
         return response;
@@ -99,14 +99,14 @@ public class BusinessProduct {
         List<EntityLot> lots = repositoryLot.findByProduct_IdProduct(p.getIdProduct());
 
         int totalStock = lots.stream()
-            .mapToInt(EntityLot::getCurrentStock)
-            .sum();
+                .mapToInt(EntityLot::getCurrentStock)
+                .sum();
 
         String nextExpiration = lots.stream()
-            .map(EntityLot::getExpirationDate)
-            .min(LocalDate::compareTo)
-            .map(LocalDate::toString)
-            .orElse("");
+                .map(EntityLot::getExpirationDate)
+                .min(LocalDate::compareTo)
+                .map(LocalDate::toString)
+                .orElse("");
 
         Map<String, String> data = new HashMap<>();
         data.put("idProduct", p.getIdProduct());
@@ -122,11 +122,11 @@ public class BusinessProduct {
         data.put("nextExpiration", nextExpiration);
         data.put("laboratory", p.getLaboratory() != null ? p.getLaboratory().getName() : "");
         data.put("category", p.getCategory() != null ? p.getCategory().getName() : "");
-        data.put("createdAt", p.getCreatedAt().toString());
-        
+        data.put("createdAt", p.getCreatedAt() != null ? p.getCreatedAt().toString() : "");
+
         return data;
     }
-    
+
     public ResponseProductStockAlert getStockAlert() {
         ResponseProductStockAlert response = new ResponseProductStockAlert();
 
@@ -135,9 +135,9 @@ public class BusinessProduct {
         int stockCritico = 0;
         for (EntityProduct p : productos) {
             int totalStock = repositoryLot.findByProduct_IdProduct(p.getIdProduct())
-                .stream()
-                .mapToInt(EntityLot::getCurrentStock)
-                .sum();
+                    .stream()
+                    .mapToInt(EntityLot::getCurrentStock)
+                    .sum();
             if (totalStock <= p.getStockMinimum()) {
                 stockCritico++;
             }
@@ -152,5 +152,4 @@ public class BusinessProduct {
         response.success();
         return response;
     }
-    
 }
